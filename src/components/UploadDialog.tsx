@@ -92,9 +92,7 @@ export default function UploadDialog({ open, onClose, onDone }: Props) {
           将处理好的 Verge3D 项目上传到静态托管服务，粘贴可访问的链接
         </p>
 
-        {errorMsg && (
-          <p className="mb-3 text-xs text-red-400">{errorMsg}</p>
-        )}
+        {errorMsg && <p className="mb-3 text-xs text-red-400">{errorMsg}</p>}
 
         <button
           onClick={handleSubmit}

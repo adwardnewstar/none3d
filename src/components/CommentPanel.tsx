@@ -589,6 +589,22 @@ export default function CommentPanel({
     }
   }, [pingedCommentId, setPingedCommentId]);
 
+  // 监听视口"确认标定"按钮创建的评论，刷新列表
+  useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      const detail = e.detail;
+      if (!detail || !detail._id) return;
+      // 将新评论插入列表顶部
+      setComments((prev) => [detail as CommentItem, ...prev]);
+    };
+    window.addEventListener("viewport-calibrate", handler as EventListener);
+    return () =>
+      window.removeEventListener(
+        "viewport-calibrate",
+        handler as EventListener,
+      );
+  }, []);
+
   // ===== 点赞 =====
   const handleToggleLike = useCallback(
     async (comment: CommentItem) => {
@@ -817,14 +833,14 @@ export default function CommentPanel({
     if (!requireAuth()) return;
     setSubmitting(true);
 
-    const ok = await addComment(
+    const newId = await addComment(
       appId,
       user?.username || "匿名用户",
       content,
       undefined,
       images,
     );
-    if (ok) {
+    if (newId) {
       setContent("");
       setImages([]);
       setTimeout(autoResize, 0);

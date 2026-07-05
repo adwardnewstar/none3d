@@ -11,7 +11,10 @@ function mapComment(row: any): CommentItem {
     nickname: row.nickname,
     content: row.content,
     isCalibrated: row.is_calibrated,
-    position: row.position_x != null ? { x: row.position_x, y: row.position_y, z: row.position_z } : null,
+    position:
+      row.position_x != null
+        ? { x: row.position_x, y: row.position_y, z: row.position_z }
+        : null,
     likes: row.likes,
     likedBy: row.liked_by || [],
     dislikes: row.dislikes,
@@ -39,44 +42,52 @@ export async function queryComments(appId: string): Promise<CommentItem[]> {
   }
 }
 
-/** 添加评论 */
+/** 添加评论，返回创建的评论 ID（或 null 表示失败） */
 export async function addComment(
   appId: string,
   nickname: string,
   content: string,
   parentId?: string | null,
   images?: string[],
-): Promise<boolean> {
+  isCalibrated?: boolean,
+  position?: { x: number; y: number; z: number } | null,
+): Promise<string | null> {
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData?.session?.user?.id || null;
-    const { error } = await supabase.from("n3d_comments").insert({
-      app_id: appId,
-      parent_id: parentId || null,
-      user_id: userId,
-      nickname: nickname.trim() || "匿名用户",
-      content: content.trim(),
-      is_calibrated: false,
-      position_x: null,
-      position_y: null,
-      position_z: null,
-      likes: 0,
-      liked_by: [],
-      dislikes: 0,
-      disliked_by: [],
-      images: images && images.length > 0 ? images : [],
-    });
+    const { data, error } = await supabase
+      .from("n3d_comments")
+      .insert({
+        app_id: appId,
+        parent_id: parentId || null,
+        user_id: userId,
+        nickname: nickname.trim() || "匿名用户",
+        content: content.trim(),
+        is_calibrated: isCalibrated || false,
+        position_x: position?.x ?? null,
+        position_y: position?.y ?? null,
+        position_z: position?.z ?? null,
+        likes: 0,
+        liked_by: [],
+        dislikes: 0,
+        disliked_by: [],
+        images: images && images.length > 0 ? images : [],
+      })
+      .select("id");
 
     if (error) throw error;
-    return true;
+    return data?.[0]?.id || null;
   } catch (e) {
     console.error("添加评论失败:", e);
-    return false;
+    return null;
   }
 }
 
 /** 更新评论内容 */
-export async function updateComment(commentId: string, content: string): Promise<boolean> {
+export async function updateComment(
+  commentId: string,
+  content: string,
+): Promise<boolean> {
   try {
     const { error } = await supabase
       .from("n3d_comments")
@@ -94,7 +105,10 @@ export async function updateComment(commentId: string, content: string): Promise
 /** 删除评论 */
 export async function deleteComment(commentId: string): Promise<boolean> {
   try {
-    const { error } = await supabase.from("n3d_comments").delete().eq("id", commentId);
+    const { error } = await supabase
+      .from("n3d_comments")
+      .delete()
+      .eq("id", commentId);
     if (error) throw error;
     return true;
   } catch (e) {
@@ -124,7 +138,10 @@ export async function calibrateComment(
       updateData.position_z = null;
     }
 
-    const { error } = await supabase.from("n3d_comments").update(updateData).eq("id", commentId);
+    const { error } = await supabase
+      .from("n3d_comments")
+      .update(updateData)
+      .eq("id", commentId);
     if (error) throw error;
     return true;
   } catch (e) {

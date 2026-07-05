@@ -21,7 +21,10 @@ export default function App() {
       if (user) {
         // 保留已有的 isAdmin（onAuthChange 不返回 isAdmin，避免被覆盖）
         const currentUser = useUserStore.getState().user;
-        setUser({ ...user, isAdmin: user.isAdmin ?? currentUser?.isAdmin ?? false });
+        setUser({
+          ...user,
+          isAdmin: user.isAdmin ?? currentUser?.isAdmin ?? false,
+        });
       } else {
         setUser(null);
       }

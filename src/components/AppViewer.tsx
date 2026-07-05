@@ -197,23 +197,33 @@ export default function AppViewer() {
     setCalibrateSubmitting(true);
 
     const nickname = calibrateNickname.trim() || "匿名用户";
-    const commentId = "cmt-" + Date.now();
+    const content = calibrateContent.trim();
+    const images = calibrateImages.length > 0 ? calibrateImages : undefined;
+    const isCalibrated = true;
+    const position = calibratePos;
+    const createdAt = new Date().toISOString();
+
+    // 统一的添加逻辑：创建一个带标定数据的评论
+    let commentId: string | null = null;
 
     if (import.meta.env.DEV) {
-      // mock 模式：先通知 CommentPanel 刷新（通过自定义事件）
-      send({
-        type: "create-annotation",
-        commentId,
-        position: calibratePos,
-        content: calibrateContent.trim(),
-        likes: 0,
-        dislikes: 0,
-        replyCount: 0,
-        nickname: calibrateNickname.trim() || "匿名用户",
-        createdAt: new Date().toISOString(),
-        images: calibrateImages.length > 0 ? calibrateImages : undefined,
-      });
-      // 通过浏览器事件通知 CommentPanel 新增评论
+      // mock 模式：用时间戳生成 ID
+      commentId = "cmt-" + Date.now();
+    } else {
+      // 生产：创建带有标定数据的评论到数据库
+      commentId = await addComment(
+        viewing?._id || "",
+        nickname,
+        content,
+        undefined,
+        images,
+        isCalibrated,
+        position,
+      );
+    }
+
+    // 通过浏览器事件通知 CommentPanel 新增评论（双模式通用）
+    if (commentId) {
       window.dispatchEvent(
         new CustomEvent("viewport-calibrate", {
           detail: {
@@ -221,37 +231,35 @@ export default function AppViewer() {
             appId: viewing?._id,
             parentId: null,
             nickname,
-            content: calibrateContent.trim(),
-            isCalibrated: true,
-            position: calibratePos,
+            content,
+            isCalibrated,
+            position,
             likes: 0,
             likedBy: [],
             dislikes: 0,
             dislikedBy: [],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            images: calibrateImages.length > 0 ? calibrateImages : undefined,
+            createdAt,
+            updatedAt: createdAt,
+            images,
           },
         }),
       );
-    } else {
-      // 生产：先创建评论到数据库
-      const ok = await addComment(
-        viewing?._id || "",
+    }
+
+    if (commentId && calibratePos) {
+      // 在 3D 场景中创建 annotation
+      send({
+        type: "create-annotation",
+        commentId,
+        position: calibratePos,
+        content,
+        likes: 0,
+        dislikes: 0,
+        replyCount: 0,
         nickname,
-        calibrateContent.trim(),
-        undefined,
-        calibrateImages.length > 0 ? calibrateImages : undefined,
-      );
-      if (ok) {
-        send({
-          type: "create-annotation",
-          commentId,
-          position: calibratePos,
-          content: calibrateContent.trim(),
-          images: calibrateImages.length > 0 ? calibrateImages : undefined,
-        });
-      }
+        createdAt,
+        images,
+      });
     }
 
     setCalibratePos(null);
@@ -272,8 +280,8 @@ export default function AppViewer() {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
-      {/* 顶部栏：关闭(左) + 标题(中) + 评论按钮(右) — 在 iframe 外面 */}
-      <div className="relative z-50 flex h-12 shrink-0 items-center justify-between bg-black/90 px-4">
+      {/* 顶部栏：关闭(左) + 标题(中) + 评论按钮(右) — 绝对定位浮在 iframe 上 */}
+      <div className="absolute left-0 right-0 top-0 z-50 flex h-12 items-center justify-between px-4">
         {/* 左侧：关闭 */}
         <button
           onClick={closeView}
