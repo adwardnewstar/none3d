@@ -35,7 +35,7 @@ async function walkDir(
   prefix: string,
   result: FileEntry[]
 ): Promise<void> {
-  for await (const entry of dirHandle.values()) {
+  for await (const entry of (dirHandle as any).values()) {
     if (entry.kind === "directory") {
       // 跳过整个目录（media/、v3d_app_data/）
       // 注意：不传 excludeImages，避免跳过 png/jpg 目录
