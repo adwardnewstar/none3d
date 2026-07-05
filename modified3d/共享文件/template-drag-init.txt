@@ -1,0 +1,12 @@
+
+
+        // 初始化标记拖拽
+        const drag = setupDraggableMarker(app);
+        app.ExternalInterface.resetMarkerPosition = function() {
+            drag.resetPosition();
+        };
+        app.ExternalInterface.getMarkerPosition = function() {
+            const m = drag.getMarker();
+            return m ? { x: m.x, y: m.y, z: m.z } : null;
+        };
+

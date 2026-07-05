@@ -1,0 +1,62 @@
+========================================
+  Verge3D 项目改造记录
+========================================
+
+=== 一、界面外观改造 ===
+
+1. 去除 Verge3D 品牌痕迹
+   - 删除全屏按钮（HTML + CSS + JS）
+   - 删除 cdn.soft8soft.com 外部链接（避免 403）
+   - 删除 favicon / manifest / SEO meta 标签
+   - HTML lang="zh-CN"，title="3D 展示 - 项目名"
+   - CSS 添加水印隐藏：a[href*="soft8soft"] { display: none !important; }
+   - 删除 media/ 文件夹（全屏图标、favicon 等）
+
+2. 替换加载动画
+   - 把 Verge3D 默认闪屏（SimplePreloader）替换为 Apple 风格环形进度条
+   - 深色背景 + SVG 圆环 + 百分比文字，加载完毕淡出消失
+
+=== 二、标记拖拽功能 ===
+
+1. 交互方式
+   - 场景中"标记X / 标记Y / 标记Z"三个独立 Mesh 节点
+   - 点击拖动其中一个，整个标记组沿对应轴向移动
+   - Capture phase 事件拦截（先于 Verge3D 控制器处理）
+   - setPointerCapture() 防止拖拽时事件丢失
+
+2. 轴约束追踪算法
+   - 鼠标射线到轴线的最近点算法（替代 dragPlane 投影）
+   - 向量叉积公式：t = (w · cross(ray, cross(ray, axis))) / |cross(ray, axis)|²
+   - 轴映射：gltf X → Three.js X，gltf Y → Three.js Z，gltf Z → Three.js Y
+
+3. 视锥边界约束
+   - 拖拽时以标记到摄像机的距离计算可视锥体
+   - Z 方向（gltf Z）：0 ~ 可视高度 90%（不低于地面）
+   - X/Y 方向：±可视宽度 90%
+
+4. 位置持久化
+   - 拖拽结束自动保存到 localStorage
+   - 页面刷新恢复上次位置
+   - 暴露接口：resetMarkerPosition()、getMarkerPosition()
+
+5. 功能修复
+   - 修复不跟手：叉积方向用反（crossVectors(axisDir, cross1) → crossVectors(rayDir, cross1)）
+   - 修复反向：X 方向 sign = -1
+   - 修复摄像头重置：移除 controls.reset()
+   - 移除所有 console.log
+
+6. 穿透问题
+   - 用户将 Puzzles X_RAY 设为 FALSE，实现非穿透（标记在透明玻璃后可被选中改为不可穿透）
+
+=== 三、共用函数文件 ===
+
+- setupDraggableMarker() 提取为独立文件 marker-drag.js
+- 其他 Verge3D 项目只需复制该文件 + 一行 <script> 标签即可复用
+- 相关模板文件（预加载 HTML/CSS/JS、拖拽初始化）：共享文件/template-*
+
+=== 四、自动化部署脚本 ===
+
+- deploy-verge3d.ps1：一键复制 + 修改 + 上传到腾讯云 CloudBase
+- 6 步自动完成：复制→改 HTML→改 CSS→改 JS→复制共用文件→上传云托管
+- 使用：.\deploy-verge3d.ps1 -ProjectName "项目名" [-Upload]
+========================================

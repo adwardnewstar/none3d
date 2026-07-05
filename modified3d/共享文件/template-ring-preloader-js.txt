@@ -1,0 +1,33 @@
+
+/**
+ * Apple 风格环形加载进度条
+ */
+function createRingPreloader() {
+    const preloaderEl = document.getElementById('custom-preloader');
+    if (!preloaderEl) return new v3d.Preloader();
+    const ringFill = preloaderEl.querySelector('.loader-ring-fill');
+    const textEl = preloaderEl.querySelector('.loader-text');
+    const circumference = 326.73;
+
+    class RingPreloader extends v3d.Preloader {
+        onUpdate(percentage) {
+            const offset = circumference - (percentage / 100) * circumference;
+            if (ringFill) ringFill.style.strokeDashoffset = offset;
+            if (textEl) textEl.textContent = Math.round(percentage) + '%';
+        }
+
+        onFinish() {
+            if (textEl) textEl.textContent = '100%';
+            if (ringFill) ringFill.style.strokeDashoffset = 0;
+            if (preloaderEl) {
+                preloaderEl.classList.add('fade-out');
+                setTimeout(function() {
+                    if (preloaderEl.parentNode) preloaderEl.parentNode.removeChild(preloaderEl);
+                }, 500);
+            }
+        }
+    }
+
+    return new RingPreloader();
+}
+

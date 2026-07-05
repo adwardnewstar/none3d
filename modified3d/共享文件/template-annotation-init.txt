@@ -1,0 +1,15 @@
+
+        // 初始化 Annotation 通信桥
+        (function() {
+            function initAnnotation() {
+                if (!app || !app.scene || !app.scene.children.length) {
+                    setTimeout(initAnnotation, 500);
+                    return;
+                }
+                if (typeof setupAnnotationBridge === 'function') {
+                    setupAnnotationBridge(app);
+                }
+            }
+            initAnnotation();
+        })();
+
