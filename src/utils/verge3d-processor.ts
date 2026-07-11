@@ -70,10 +70,10 @@ function setupDraggableMarker(app) {
     }
     function onPointerUpCapture(e) {
         if(!isDragging)return; if(capturedPointerId!==null){try{domElement.releasePointerCapture(capturedPointerId)}catch(_){}} capturedPointerId=null;
-        isDragging=false; activeAxis=null; domElement.style.cursor='default'; if(app.controls)app.controls.enabled=true; const pos=getGroupPosition(); localStorage.setItem(STORAGE_KEY,JSON.stringify({x:pos.x,y:pos.y,z:pos.z}));
+        isDragging=false; activeAxis=null; initialAxisOffset=0; domElement.style.cursor='default'; if(app.controls)app.controls.enabled=true; const pos=getGroupPosition(); localStorage.setItem(STORAGE_KEY,JSON.stringify({x:pos.x,y:pos.y,z:pos.z}));
     }
     domElement.addEventListener('pointerdown',onPointerDownCapture,true); domElement.addEventListener('pointermove',onPointerMoveCapture,true); domElement.addEventListener('pointerup',onPointerUpCapture,true);
-    domElement.addEventListener('pointerleave',function(e){if(!isDragging)return; if(capturedPointerId!==null){try{domElement.releasePointerCapture(capturedPointerId)}catch(_){}} capturedPointerId=null; isDragging=false; activeAxis=null; domElement.style.cursor='default'; if(app.controls)app.controls.enabled=true;});
+    domElement.addEventListener('pointerleave',function(e){if(!isDragging)return; if(capturedPointerId!==null){try{domElement.releasePointerCapture(capturedPointerId)}catch(_){}} capturedPointerId=null; isDragging=false; activeAxis=null; initialAxisOffset=0; domElement.style.cursor='default'; if(app.controls)app.controls.enabled=true;});
     return { getMarker:function(){return getGroupPosition();}, resetPosition:function(){setAllPositions(0,0,0);localStorage.removeItem(STORAGE_KEY);}, setAxis:function(axis){buttonAxis=axis;} };
 };`;
 

@@ -283,6 +283,7 @@ function setupDraggableMarker(app) {
 
     isDragging = false;
     activeAxis = null;
+    initialAxisOffset = 0;
     domElement.style.cursor = "default";
 
     if (app.controls) {
@@ -310,6 +311,7 @@ function setupDraggableMarker(app) {
     }
     isDragging = false;
     activeAxis = null;
+    initialAxisOffset = 0;
     domElement.style.cursor = "default";
     if (app.controls) app.controls.enabled = true;
   });
