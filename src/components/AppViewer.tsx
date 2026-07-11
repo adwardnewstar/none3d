@@ -10,11 +10,13 @@ import {
   Paperclip,
   PanelLeftOpen,
   PanelLeftClose,
+  Move,
 } from "lucide-react";
 import { useAppStore, useUserStore } from "@/store";
-import { addComment, queryComments } from "@/api/comment";
+import { addComment, deleteComment, queryComments } from "@/api/comment";
 import { compressImage } from "@/utils/imageCompress";
 import CommentPanel from "./CommentPanel";
+import { CommentItem } from "@/types";
 
 export default function AppViewer() {
   const {
@@ -34,6 +36,14 @@ export default function AppViewer() {
   const [annotationsVisible, setAnnotationsVisible] = useState(true);
   const [coordinatesVisible, setCoordinatesVisible] = useState(true);
 
+  // 坐标操作模式
+  const [axisModeActive, setAxisModeActive] = useState(false);
+  const [activeAxis, setActiveAxis] = useState<"x" | "y" | "z" | null>(null);
+  const axisModeSavedRef = useRef<{
+    annotations: boolean;
+    coordinates: boolean;
+  } | null>(null);
+
   const [iframeLoading, setIframeLoading] = useState(false);
 
   // 侧边栏折叠状态（默认折叠）
@@ -46,7 +56,7 @@ export default function AppViewer() {
     y: number;
     z: number;
   } | null>(null);
-  const [calibrateNickname, setCalibrateNickname] = useState("");
+
   const [calibrateContent, setCalibrateContent] = useState("");
   const [calibrateSubmitting, setCalibrateSubmitting] = useState(false);
   const [calibrateImages, setCalibrateImages] = useState<string[]>([]);
@@ -65,6 +75,26 @@ export default function AppViewer() {
     }
   }, []);
 
+  // 删除评论确认弹窗
+  const [deleteTarget, setDeleteTarget] = useState<CommentItem | null>(null);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    send({ type: "remove-annotation", commentId: deleteTarget._id });
+    await deleteComment(deleteTarget._id);
+    setDeleteTarget(null);
+    setAnnotationAction(null);
+    // 通知 CommentPanel 刷新
+    window.dispatchEvent(
+      new CustomEvent("comment-deleted", { detail: { id: deleteTarget._id } }),
+    );
+  }, [deleteTarget, send, setAnnotationAction]);
+
+  const handleCancelDelete = useCallback(() => {
+    setDeleteTarget(null);
+    setAnnotationAction(null);
+  }, [setAnnotationAction]);
+
   // ref 保存恢复函数，避免 handleMessage useCallback 闭包陈旧
   const restoreCalibratedRef = useRef<() => void>(() => {});
   useEffect(() => {
@@ -72,8 +102,38 @@ export default function AppViewer() {
       if (!viewing) return;
       try {
         const comments = await queryComments(viewing._id);
+        // 提取所有回复的映射（parentId → reply list）
+        const replyMap: Record<
+          string,
+          {
+            _id: string;
+            nickname: string;
+            content: string;
+            images?: string[];
+            isBest?: boolean;
+            likes: number;
+            dislikes: number;
+            createdAt: string;
+          }[]
+        > = {};
+        for (const c of comments) {
+          if (c.parentId) {
+            if (!replyMap[c.parentId]) replyMap[c.parentId] = [];
+            replyMap[c.parentId].push({
+              _id: c._id,
+              nickname: c.nickname,
+              content: c.content,
+              images: c.images || [],
+              isBest: c.isBest,
+              likes: c.likes,
+              dislikes: c.dislikes,
+              createdAt: c.createdAt,
+            });
+          }
+        }
         for (const c of comments) {
           if (c.isCalibrated && !c.parentId && c.position) {
+            const replies = replyMap[c._id] || [];
             send({
               type: "create-annotation",
               commentId: c._id,
@@ -81,7 +141,8 @@ export default function AppViewer() {
               content: c.content,
               likes: c.likes,
               dislikes: c.dislikes,
-              replyCount: 0,
+              replyCount: replies.length,
+              replies,
               nickname: c.nickname,
               createdAt: c.createdAt,
               images: c.images || [],
@@ -123,7 +184,6 @@ export default function AppViewer() {
           if (awaitingMarkerPos) {
             setAwaitingMarkerPos(false);
             setCalibratePos(msg.position);
-            setCalibrateNickname("");
             setCalibrateContent("");
           } else if (onPickedRef.current) {
             onPickedRef.current(msg.commentId, msg.position);
@@ -139,6 +199,22 @@ export default function AppViewer() {
 
         case "annotation-action":
           // 来自 3D annotation 悬停弹窗的操作
+          if (msg.action === "focus-comment") {
+            setSidebarOpen(true);
+            setPingedCommentId(msg.commentId);
+            window.dispatchEvent(new CustomEvent("sidebar-opened-by-toggle"));
+            break;
+          }
+          if (msg.action === "focus-comment-and-expand") {
+            setSidebarOpen(true);
+            setPingedCommentId(msg.commentId);
+            window.dispatchEvent(
+              new CustomEvent("expand-all-replies", {
+                detail: { commentId: msg.commentId },
+              }),
+            );
+            break;
+          }
           setAnnotationAction({
             type: msg.action,
             commentId: msg.commentId,
@@ -148,7 +224,12 @@ export default function AppViewer() {
           break;
       }
     },
-    [awaitingMarkerPos, setPingedCommentId, setAnnotationAction],
+    [
+      awaitingMarkerPos,
+      setPingedCommentId,
+      setAnnotationAction,
+      setSidebarOpen,
+    ],
   );
 
   useEffect(() => {
@@ -170,7 +251,53 @@ export default function AppViewer() {
     send({ type: next ? "show-coordinates" : "hide-coordinates" });
   };
 
+  // 坐标操作模式
+  const toggleAxisMode = () => {
+    if (axisModeActive) {
+      // 退出：恢复保存的状态
+      const saved = axisModeSavedRef.current;
+      setAxisModeActive(false);
+      setActiveAxis(null);
+      send({ type: "set-active-axis", axis: null });
+      if (saved) {
+        setAnnotationsVisible(saved.annotations);
+        setCoordinatesVisible(saved.coordinates);
+        send({
+          type: saved.annotations ? "show-annotations" : "hide-annotations",
+        });
+        send({
+          type: saved.coordinates ? "show-coordinates" : "hide-coordinates",
+        });
+      }
+      axisModeSavedRef.current = null;
+    } else {
+      // 进入：保存当前状态，强制坐标显示，隐藏标注
+      axisModeSavedRef.current = {
+        annotations: annotationsVisible,
+        coordinates: coordinatesVisible,
+      };
+      setAxisModeActive(true);
+      if (!coordinatesVisible) {
+        setCoordinatesVisible(true);
+        send({ type: "show-coordinates" });
+      }
+      if (annotationsVisible) {
+        setAnnotationsVisible(false);
+        send({ type: "hide-annotations" });
+      }
+    }
+  };
+
+  const handleSelectAxis = (axis: "x" | "y" | "z") => {
+    const next = activeAxis === axis ? null : axis;
+    setActiveAxis(next);
+    send({ type: "set-active-axis", axis: next });
+    console.log("[AppViewer] sending set-axis-edge-glow, axis:", next);
+    send({ type: "set-axis-edge-glow", axis: next });
+  };
+
   // 确认标定：获取标记组位置（与侧边栏逻辑一致）
+  const user = useUserStore((s) => s.user);
   const requireAuth = useUserStore((s) => s.requireAuth);
   const startViewCalibrate = () => {
     if (!requireAuth()) return;
@@ -226,7 +353,7 @@ export default function AppViewer() {
     if (!requireAuth()) return;
     setCalibrateSubmitting(true);
 
-    const nickname = calibrateNickname.trim() || "匿名用户";
+    const nickname = user?.username || "匿名用户";
     const content = calibrateContent.trim();
     const images = calibrateImages.length > 0 ? calibrateImages : undefined;
     const isCalibrated = true;
@@ -236,21 +363,16 @@ export default function AppViewer() {
     // 统一的添加逻辑：创建一个带标定数据的评论
     let commentId: string | null = null;
 
-    if (import.meta.env.DEV) {
-      // mock 模式：用时间戳生成 ID
-      commentId = "cmt-" + Date.now();
-    } else {
-      // 生产：创建带有标定数据的评论到数据库
-      commentId = await addComment(
-        viewing?._id || "",
-        nickname,
-        content,
-        undefined,
-        images,
-        isCalibrated,
-        position,
-      );
-    }
+    // 创建带有标定数据的评论到数据库（DEV/生产均落库）
+    commentId = await addComment(
+      viewing?._id || "",
+      nickname,
+      content,
+      undefined,
+      images,
+      isCalibrated,
+      position,
+    );
 
     // 通过浏览器事件通知 CommentPanel 新增评论（双模式通用）
     if (commentId) {
@@ -260,6 +382,7 @@ export default function AppViewer() {
             _id: commentId,
             appId: viewing?._id,
             parentId: null,
+            userId: user?.uid ?? null,
             nickname,
             content,
             isCalibrated,
@@ -294,7 +417,6 @@ export default function AppViewer() {
 
     setCalibratePos(null);
     setCalibrateContent("");
-    setCalibrateNickname("");
     setCalibrateImages([]);
     setCalibrateSubmitting(false);
   };
@@ -364,38 +486,86 @@ export default function AppViewer() {
           sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
         />
 
-        {/* 底部居中：三个操作按钮 */}
-        <div className="absolute bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2">
+        {/* 底部居中：操作按钮 */}
+        <div className="absolute bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-end gap-2">
+          {/* 坐标操作按钮组 */}
+          <div className="flex flex-col items-center gap-1">
+            {axisModeActive && (
+              <div className="mb-1 flex flex-col items-center gap-1">
+                {(["z", "y", "x"] as const).map((ax) => (
+                  <button
+                    key={ax}
+                    onClick={() => handleSelectAxis(ax)}
+                    className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs backdrop-blur transition-colors ${
+                      activeAxis === ax
+                        ? "bg-orange-500/90 text-white"
+                        : "bg-red-600/30 text-red-200 hover:bg-red-600/50"
+                    }`}
+                    title={`选中${ax.toUpperCase()}轴`}
+                  >
+                    {ax.toUpperCase()}轴
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={toggleAxisMode}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs backdrop-blur transition-colors ${
+                axisModeActive
+                  ? "bg-orange-600/80 text-white hover:bg-orange-700"
+                  : "bg-red-600/30 text-red-200 hover:bg-red-600/50"
+              }`}
+              title={axisModeActive ? "退出坐标操作" : "进入坐标操作"}
+            >
+              <Move size={14} />
+              <span className="max-md:hidden">坐标操作</span>
+            </button>
+          </div>
+
           <button
             onClick={toggleAnnotations}
+            disabled={axisModeActive}
             className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs backdrop-blur transition-colors ${
-              annotationsVisible
-                ? "bg-blue-600/80 text-white hover:bg-blue-700"
-                : "bg-black/40 text-gray-400 hover:bg-black/60"
+              axisModeActive
+                ? "bg-black/20 text-gray-600 cursor-not-allowed"
+                : annotationsVisible
+                  ? "bg-blue-600/80 text-white hover:bg-blue-700"
+                  : "bg-black/40 text-gray-400 hover:bg-black/60"
             }`}
             title={annotationsVisible ? "隐藏标注" : "显示标注"}
           >
             {annotationsVisible ? <Eye size={14} /> : <EyeOff size={14} />}
-            <span className="max-md:hidden">显示标注</span>
+            <span className="max-md:hidden">
+              {annotationsVisible ? "隐藏标注" : "显示标注"}
+            </span>
           </button>
 
           <button
-            onClick={toggleCoordinates}
+            onClick={axisModeActive ? undefined : toggleCoordinates}
+            disabled={axisModeActive}
             className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs backdrop-blur transition-colors ${
-              coordinatesVisible
-                ? "bg-blue-600/80 text-white hover:bg-blue-700"
-                : "bg-black/40 text-gray-400 hover:bg-black/60"
+              axisModeActive
+                ? "bg-black/20 text-gray-600 cursor-not-allowed"
+                : coordinatesVisible
+                  ? "bg-blue-600/80 text-white hover:bg-blue-700"
+                  : "bg-black/40 text-gray-400 hover:bg-black/60"
             }`}
             title={coordinatesVisible ? "隐藏标记组" : "显示标记组"}
           >
             <MapPin size={14} />
-            <span className="max-md:hidden">显示坐标</span>
+            <span className="max-md:hidden">
+              {coordinatesVisible ? "隐藏坐标" : "显示坐标"}
+            </span>
           </button>
 
           <button
             onClick={startViewCalibrate}
-            disabled={awaitingMarkerPos}
-            className="flex items-center gap-1.5 rounded-full bg-green-600/80 px-3 py-1.5 text-xs text-white backdrop-blur transition-colors hover:bg-green-700 disabled:opacity-60"
+            disabled={axisModeActive || awaitingMarkerPos}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs backdrop-blur transition-colors ${
+              axisModeActive
+                ? "bg-black/20 text-gray-600 cursor-not-allowed"
+                : "bg-green-600/80 text-white hover:bg-green-700 disabled:opacity-60"
+            }`}
             title="获取标记组位置生成标定"
           >
             <PlusCircle size={14} />
@@ -423,7 +593,11 @@ export default function AppViewer() {
         <CommentPanel
           appId={viewing._id}
           sidebarOpen={sidebarOpen}
-          onToggleSidebar={() => setSidebarOpen((v) => !v)}
+          onToggleSidebar={() => {
+            setSidebarOpen((v) => !v);
+            window.dispatchEvent(new CustomEvent("sidebar-opened-by-toggle"));
+          }}
+          onRequestDeleteComment={setDeleteTarget}
         />
       </div>
 
@@ -438,14 +612,6 @@ export default function AppViewer() {
               位置: ({calibratePos.x.toFixed(2)}, {calibratePos.y.toFixed(2)},{" "}
               {calibratePos.z.toFixed(2)})
             </p>
-            <input
-              type="text"
-              placeholder="你的昵称（可选）"
-              value={calibrateNickname}
-              onChange={(e) => setCalibrateNickname(e.target.value)}
-              maxLength={20}
-              className="mt-3 w-full rounded-lg border bg-gray-50 px-3 py-1.5 text-sm text-gray-800 outline-none focus:border-blue-400 focus:bg-white"
-            />
             <textarea
               placeholder="请输入内容"
               value={calibrateContent}
@@ -487,7 +653,6 @@ export default function AppViewer() {
                 onClick={() => {
                   setCalibratePos(null);
                   setCalibrateContent("");
-                  setCalibrateNickname("");
                   setCalibrateImages([]);
                 }}
                 className="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100"
@@ -515,6 +680,32 @@ export default function AppViewer() {
                   <Send size={14} />
                 )}
                 生成
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 删除评论确认弹窗（悬浮全屏，与侧边栏无关） */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30">
+          <div className="w-80 rounded-xl bg-white p-5 shadow-lg">
+            <h3 className="text-base font-medium text-gray-800">删除评论</h3>
+            <p className="mt-2 text-sm text-gray-500">
+              确认要删除此评论吗？评论和场景中的 annotation 将被一起移除。
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={handleCancelDelete}
+                className="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="rounded-lg bg-red-500 px-3 py-1.5 text-sm text-white hover:bg-red-600"
+              >
+                删除
               </button>
             </div>
           </div>

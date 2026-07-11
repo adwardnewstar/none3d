@@ -12,7 +12,7 @@ import {
   Heart,
   ThumbsDown,
   LogOut,
-  Settings,
+  User,
   PanelLeftClose,
 } from "lucide-react";
 import { compressImage } from "@/utils/imageCompress";
@@ -24,6 +24,7 @@ import {
   calibrateComment,
   toggleLike,
   toggleDislike,
+  toggleBest,
 } from "@/api/comment";
 import { logout } from "@/api/auth";
 import { generateAvatar } from "@/utils/avatar";
@@ -436,25 +437,35 @@ function ConfirmDialog({
 function EditDialog({
   open,
   initialContent,
+  initialImages,
   onSave,
   onCancel,
+  title = "编辑评论",
 }: {
   open: boolean;
   initialContent: string;
-  onSave: (content: string) => void;
+  initialImages?: string[];
+  onSave: (content: string, images?: string[]) => void;
   onCancel: () => void;
+  title?: string;
 }) {
   const [text, setText] = useState(initialContent);
+  const [images, setImages] = useState<string[]>(initialImages || []);
 
   useEffect(() => {
     setText(initialContent);
-  }, [initialContent, open]);
+    setImages(initialImages || []);
+  }, [initialContent, initialImages, open]);
+
+  const removeImage = (idx: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== idx));
+  };
 
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30">
       <div className="w-80 rounded-xl bg-white p-5 shadow-lg">
-        <h3 className="text-base font-medium text-gray-800">编辑评论</h3>
+        <h3 className="text-base font-medium text-gray-800">{title}</h3>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -462,6 +473,25 @@ function EditDialog({
           rows={3}
           className="mt-2 w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none focus:border-blue-400 text-gray-800"
         />
+        {images.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {images.map((img, i) => (
+              <div key={i} className="relative inline-block">
+                <img
+                  src={img}
+                  alt="edit-img"
+                  className="h-12 w-12 rounded border object-cover"
+                />
+                <button
+                  onClick={() => removeImage(i)}
+                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gray-700 text-[10px] text-white hover:bg-red-500"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="mt-3 flex justify-end gap-2">
           <button
             onClick={onCancel}
@@ -470,7 +500,7 @@ function EditDialog({
             取消
           </button>
           <button
-            onClick={() => onSave(text)}
+            onClick={() => onSave(text, images.length > 0 ? images : undefined)}
             disabled={!text.trim()}
             className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
           >
@@ -486,10 +516,12 @@ export default function CommentPanel({
   appId,
   sidebarOpen,
   onToggleSidebar,
+  onRequestDeleteComment,
 }: {
   appId: string;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  onRequestDeleteComment?: (comment: CommentItem) => void;
 }) {
   const {
     postToVerge3D,
@@ -507,6 +539,19 @@ export default function CommentPanel({
   const [images, setImages] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // 点击外部关闭菜单
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   // 登录用户
   const user = useUserStore((s) => s.user);
@@ -569,6 +614,11 @@ export default function CommentPanel({
   const [deleteCommentTarget, setDeleteCommentTarget] =
     useState<CommentItem | null>(null);
   const [moveTarget, setMoveTarget] = useState<CommentItem | null>(null);
+  const [replyDeleteTarget, setReplyDeleteTarget] =
+    useState<CommentItem | null>(null);
+  const [replyEditTarget, setReplyEditTarget] = useState<CommentItem | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -601,6 +651,43 @@ export default function CommentPanel({
     return () =>
       window.removeEventListener(
         "viewport-calibrate",
+        handler as EventListener,
+      );
+  }, []);
+
+  // 监听 AppViewer 删除评论后刷新
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener("comment-deleted", handler);
+    return () => window.removeEventListener("comment-deleted", handler);
+  }, [load]);
+
+  // 监听 3D 内容框"共X条回复"按钮 → 独享展开该评论的回复
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.commentId) {
+        setShowAllReplies(new Set([detail.commentId]));
+      }
+    };
+    window.addEventListener("expand-all-replies", handler as EventListener);
+    return () =>
+      window.removeEventListener(
+        "expand-all-replies",
+        handler as EventListener,
+      );
+  }, []);
+
+  // 普通打开侧边栏（非共X条回复）→ 回复全折叠
+  useEffect(() => {
+    const handler = () => setShowAllReplies(new Set());
+    window.addEventListener(
+      "sidebar-opened-by-toggle",
+      handler as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        "sidebar-opened-by-toggle",
         handler as EventListener,
       );
   }, []);
@@ -691,6 +778,63 @@ export default function CommentPanel({
     [user, postToVerge3D],
   );
 
+  // ===== "优"（仅管理员） =====
+  const handleToggleBest = useCallback(
+    async (comment: CommentItem) => {
+      const uid = user?.uid;
+      if (!uid) {
+        requireAuth();
+        return;
+      }
+      const currentlyBest = comment.isBest || false;
+      const newIsBest = !currentlyBest;
+
+      // 乐观更新本地状态
+      setComments((prev) =>
+        prev.map((c) =>
+          c._id === comment._id ? { ...c, isBest: newIsBest } : c,
+        ),
+      );
+
+      // 乐观同步到 3D annotation dialog（不等 API 返回）
+      if (postToVerge3D && comment.parentId) {
+        const parent = comments.find((c) => c._id === comment.parentId);
+        if (parent?.isCalibrated) {
+          postToVerge3D({
+            type: "annotation-update-reply",
+            commentId: comment.parentId,
+            replyId: comment._id,
+            isBest: newIsBest,
+          });
+        }
+      }
+
+      // 保存到数据库
+      try {
+        await toggleBest(comment._id, currentlyBest);
+      } catch {
+        // API 失败，回滚
+        setComments((prev) =>
+          prev.map((c) =>
+            c._id === comment._id ? { ...c, isBest: currentlyBest } : c,
+          ),
+        );
+        if (postToVerge3D && comment.parentId) {
+          const parent = comments.find((c) => c._id === comment.parentId);
+          if (parent?.isCalibrated) {
+            postToVerge3D({
+              type: "annotation-update-reply",
+              commentId: comment.parentId,
+              replyId: comment._id,
+              isBest: currentlyBest,
+            });
+          }
+        }
+      }
+    },
+    [user, postToVerge3D, comments],
+  );
+
   // ===== 回复提交 =====
   const handleSubmitReply = async (
     parentId: string,
@@ -739,12 +883,76 @@ export default function CommentPanel({
     }
   };
 
-  // ===== 删除回复 =====
-  const handleDeleteReply = async (reply: CommentItem) => {
+  // ===== 编辑回复 =====
+  const handleEditReplySave = async (text: string, images?: string[]) => {
+    if (!replyEditTarget) return;
     if (!requireAuth()) return;
-    if (!isOwner(reply)) return;
-    await deleteComment(reply._id);
-    await load();
+    if (!isOwner(replyEditTarget)) {
+      setReplyEditTarget(null);
+      return;
+    }
+    const capturedReplyId = replyEditTarget._id;
+    const capturedParentId = replyEditTarget.parentId;
+    const snapshot = comments;
+    setReplyEditTarget(null);
+    // 乐观更新
+    setComments((prev) =>
+      prev.map((c) =>
+        c._id === capturedReplyId
+          ? {
+              ...c,
+              content: text,
+              images: images && images.length > 0 ? images : [],
+            }
+          : c,
+      ),
+    );
+    // 立即同步到 3D content box
+    if (postToVerge3D && capturedParentId) {
+      postToVerge3D({
+        type: "annotation-update-reply",
+        commentId: capturedParentId,
+        replyId: capturedReplyId,
+        content: text,
+      });
+    }
+    try {
+      await updateComment(capturedReplyId, text, images);
+    } catch {
+      setComments(snapshot);
+    }
+  };
+
+  // ===== 删除回复 =====
+  const handleDeleteReplyConfirm = async () => {
+    if (!replyDeleteTarget) return;
+    if (!requireAuth()) return;
+    if (!isOwner(replyDeleteTarget)) return;
+    const capturedId = replyDeleteTarget._id;
+    const capturedParentId = replyDeleteTarget.parentId;
+    const snapshot = comments;
+    setReplyDeleteTarget(null);
+    // 乐观更新：移除回复
+    setComments((prev) => prev.filter((c) => c._id !== capturedId));
+    // 同步到 3D content box（更新回复计数）
+    if (postToVerge3D && capturedParentId) {
+      const newReplyCount = snapshot.filter(
+        (c) => c._id !== capturedId && c.parentId === capturedParentId,
+      ).length;
+      const parent = snapshot.find((c) => c._id === capturedParentId);
+      if (parent?.isCalibrated) {
+        postToVerge3D({
+          type: "annotation-update-counts",
+          commentId: capturedParentId,
+          replyCount: newReplyCount,
+        });
+      }
+    }
+    try {
+      await deleteComment(capturedId);
+    } catch {
+      setComments(snapshot);
+    }
   };
 
   // 监听来自 3D annotation 悬停弹窗的操作（点赞/踩/回复）
@@ -772,9 +980,60 @@ export default function CommentPanel({
         setAnnotationAction(null);
         return;
       }
-      // 来自 3D dialog 的删除操作
+      // 通过父级回调触发全屏确认弹窗
+      if (onRequestDeleteComment) {
+        onRequestDeleteComment(target);
+        return; // 不清理 annotationAction，由 AppViewer 处理完清理
+      }
+      // 降级：父级没提供回调时自己处理
       if (target.isCalibrated && postToVerge3D) {
         postToVerge3D({ type: "remove-annotation", commentId });
+      }
+      deleteComment(commentId).then(() => {
+        load();
+      });
+    } else if (type === "like-reply") {
+      const wasLiked = target.likedBy.includes(user.uid);
+      const newLikes = wasLiked ? target.likes - 1 : target.likes + 1;
+      const userLiked = !wasLiked;
+      handleToggleLike(target);
+      // 同步到 3D annotation dialog
+      if (target.parentId) {
+        const parent = comments.find((c) => c._id === target.parentId);
+        if (parent?.isCalibrated && postToVerge3D) {
+          postToVerge3D({
+            type: "annotation-update-reply",
+            commentId: parent._id,
+            replyId: target._id,
+            likes: newLikes,
+            userLiked,
+          });
+        }
+      }
+    } else if (type === "dislike-reply") {
+      const wasDisliked = target.dislikedBy.includes(user.uid);
+      const newDislikes = wasDisliked
+        ? target.dislikes - 1
+        : target.dislikes + 1;
+      const userDisliked = !wasDisliked;
+      handleToggleDislike(target);
+      // 同步到 3D annotation dialog
+      if (target.parentId) {
+        const parent = comments.find((c) => c._id === target.parentId);
+        if (parent?.isCalibrated && postToVerge3D) {
+          postToVerge3D({
+            type: "annotation-update-reply",
+            commentId: parent._id,
+            replyId: target._id,
+            dislikes: newDislikes,
+            userDisliked,
+          });
+        }
+      }
+    } else if (type === "delete-reply") {
+      if (!isOwner(target)) {
+        setAnnotationAction(null);
+        return;
       }
       deleteComment(commentId).then(() => {
         load();
@@ -858,7 +1117,15 @@ export default function CommentPanel({
       const capturedContent = comment.content;
       const existingReplies = comments
         .filter((c) => c.parentId === comment._id)
-        .map((r) => ({ nickname: r.nickname, content: r.content }));
+        .map((r) => ({
+          nickname: r.nickname,
+          content: r.content,
+          _id: r._id,
+          isBest: r.isBest,
+          likes: r.likes,
+          dislikes: r.dislikes,
+          createdAt: r.createdAt,
+        }));
       postToVerge3D({ type: "get-marker-position", commentId: comment._id });
 
       // 注册回调：Verge3D 返回标记位置后自动创建 annotation
@@ -913,7 +1180,7 @@ export default function CommentPanel({
   };
 
   // ===== 编辑 =====
-  const handleEditSave = async (text: string) => {
+  const handleEditSave = async (text: string, images?: string[]) => {
     if (!editTarget) return;
     if (!requireAuth()) return;
     if (!isOwner(editTarget)) {
@@ -921,16 +1188,32 @@ export default function CommentPanel({
       return;
     }
     const capturedId = editTarget._id;
-    await updateComment(capturedId, text);
+    const snapshot = comments;
     setEditTarget(null);
-    await load();
-    // 更新 3D 场景中 annotation 的弹窗内容
+    // 乐观更新
+    setComments((prev) =>
+      prev.map((c) =>
+        c._id === capturedId
+          ? {
+              ...c,
+              content: text,
+              images: images && images.length > 0 ? images : [],
+            }
+          : c,
+      ),
+    );
+    // 立即同步到 3D content box
     if (postToVerge3D) {
       postToVerge3D({
         type: "update-annotation",
         commentId: capturedId,
         content: text,
       });
+    }
+    try {
+      await updateComment(capturedId, text, images);
+    } catch {
+      setComments(snapshot);
     }
   };
 
@@ -947,7 +1230,8 @@ export default function CommentPanel({
       postToVerge3D({ type: "get-marker-position", commentId: capturedId });
 
       setOnPositionPicked(async (commentId, position) => {
-        // 更新本地状态
+        const snapshot = comments;
+        // 乐观更新本地状态
         setComments((prev) =>
           prev.map((c) =>
             c._id === commentId
@@ -955,9 +1239,7 @@ export default function CommentPanel({
               : c,
           ),
         );
-        // 更新数据库
-        await calibrateComment(commentId, position);
-        // 更新 3D 场景中的 annotation 位置
+        // 立即更新 3D 场景中的 annotation 位置
         if (postToVerge3D) {
           postToVerge3D({
             type: "move-annotation",
@@ -966,7 +1248,11 @@ export default function CommentPanel({
           });
         }
         setOnPositionPicked(null);
-        await load();
+        try {
+          await calibrateComment(commentId, position);
+        } catch {
+          setComments(snapshot);
+        }
       });
     }
     setMoveTarget(null);
@@ -981,12 +1267,25 @@ export default function CommentPanel({
       return;
     }
     const capturedId = deleteTarget._id;
-    await calibrateComment(capturedId, null);
+    const snapshot = comments;
+    setDeleteTarget(null);
+    // 乐观更新
+    setComments((prev) =>
+      prev.map((c) =>
+        c._id === capturedId
+          ? { ...c, isCalibrated: false, position: null }
+          : c,
+      ),
+    );
+    // 立即同步到 3D
     if (postToVerge3D) {
       postToVerge3D({ type: "remove-annotation", commentId: capturedId });
     }
-    setDeleteTarget(null);
-    await load();
+    try {
+      await calibrateComment(capturedId, null);
+    } catch {
+      setComments(snapshot);
+    }
   };
 
   // ===== 删除评论（整条删除 + 移除标注） =====
@@ -998,14 +1297,22 @@ export default function CommentPanel({
       return;
     }
     const capturedId = deleteCommentTarget._id;
-    // 如果有标定，先移除 annotation
+    const snapshot = comments;
+    setDeleteCommentTarget(null);
+    setAnnotationAction(null);
+    // 乐观更新：移除评论及其所有回复
+    setComments((prev) =>
+      prev.filter((c) => c._id !== capturedId && c.parentId !== capturedId),
+    );
+    // 同步到 3D
     if (deleteCommentTarget.isCalibrated && postToVerge3D) {
       postToVerge3D({ type: "remove-annotation", commentId: capturedId });
     }
-    // 删除数据库记录
-    await deleteComment(capturedId);
-    setDeleteCommentTarget(null);
-    await load();
+    try {
+      await deleteComment(capturedId);
+    } catch {
+      setComments(snapshot);
+    }
   };
 
   return (
@@ -1031,11 +1338,11 @@ export default function CommentPanel({
         {/* 右侧：用户操作 */}
         <div className="flex items-center gap-1">
           {user ? (
-            <>
+            <div className="relative flex items-center" ref={menuRef}>
               <button
-                onClick={() => useUserStore.getState().setProfileOpen(true)}
+                onClick={() => setMenuOpen((v) => !v)}
                 className="h-7 w-7 overflow-hidden rounded-full border border-gray-300 transition-colors hover:border-gray-400"
-                title="个人资料"
+                title="用户菜单"
               >
                 <img
                   src={
@@ -1046,24 +1353,32 @@ export default function CommentPanel({
                   className="h-full w-full object-cover"
                 />
               </button>
-              <button
-                onClick={() => {}}
-                className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-                title="设置"
-              >
-                <Settings size={14} />
-              </button>
-              <button
-                onClick={async () => {
-                  await logout();
-                  useUserStore.setState({ user: null });
-                }}
-                className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-500"
-                title="退出"
-              >
-                <LogOut size={14} />
-              </button>
-            </>
+              {menuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-36 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl z-50">
+                  <button
+                    onClick={() => {
+                      useUserStore.getState().setProfileOpen(true);
+                      setMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    <User size={14} />
+                    个人资料
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await logout();
+                      useUserStore.setState({ user: null });
+                      setMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 hover:text-red-500"
+                  >
+                    <LogOut size={14} />
+                    退出登录
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <button
               onClick={() => useUserStore.getState().setShowAuthModal(true)}
@@ -1093,7 +1408,29 @@ export default function CommentPanel({
               const allExpanded = showAllReplies.has(c._id);
               const visibleReplies = allExpanded
                 ? sortedReplies
-                : sortedReplies.slice(-1);
+                : (() => {
+                    const bestReplies = sortedReplies.filter((r) => r.isBest);
+                    if (bestReplies.length > 0) {
+                      // 优中选赞最多，赞相同选最新
+                      const best = bestReplies.sort((a, b) => {
+                        if (b.likes !== a.likes) return b.likes - a.likes;
+                        return (
+                          new Date(b.createdAt).getTime() -
+                          new Date(a.createdAt).getTime()
+                        );
+                      })[0];
+                      return [best];
+                    }
+                    // 无优，选赞最多，赞相同选最新
+                    const top = [...sortedReplies].sort((a, b) => {
+                      if (b.likes !== a.likes) return b.likes - a.likes;
+                      return (
+                        new Date(b.createdAt).getTime() -
+                        new Date(a.createdAt).getTime()
+                      );
+                    })[0];
+                    return [top];
+                  })();
 
               return (
                 <div key={c._id}>
@@ -1187,7 +1524,7 @@ export default function CommentPanel({
                         <div key={r._id}>
                           <ReplyCapsule
                             reply={r}
-                            onDelete={() => handleDeleteReply(r)}
+                            onDelete={() => setReplyDeleteTarget(r)}
                             onImageClick={setLightboxSrc}
                             isOwner={isOwner(r)}
                           />
@@ -1232,6 +1569,54 @@ export default function CommentPanel({
                               <span>踩</span>
                               {r.dislikes > 0 && <span>{r.dislikes}</span>}
                             </button>
+                            {/* 优（仅管理员可见） */}
+                            {user?.isAdmin && (
+                              <button
+                                onClick={() => handleToggleBest(r)}
+                                className={`flex items-center gap-1 text-xs transition-colors ${
+                                  r.isBest
+                                    ? "text-amber-500"
+                                    : "text-gray-400 hover:text-amber-400"
+                                }`}
+                                title={r.isBest ? "取消优" : "标记为优"}
+                              >
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill={r.isBest ? "currentColor" : "none"}
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <circle cx="12" cy="12" r="10" />
+                                </svg>
+                                <span>优</span>
+                              </button>
+                            )}
+                            {/* 编辑（作者和管理员可见） */}
+                            {(isOwner(r) || user?.isAdmin) && (
+                              <button
+                                onClick={() => setReplyEditTarget(r)}
+                                className="flex items-center gap-1 text-xs text-gray-400 transition-colors hover:text-blue-500"
+                                title="编辑回复"
+                              >
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                                </svg>
+                                <span>编辑</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1335,9 +1720,10 @@ export default function CommentPanel({
 
       {/* 弹窗 */}
       <EditDialog
-        key={editTarget?._id || "closed"}
+        key={editTarget?._id || "edit-closed"}
         open={!!editTarget}
         initialContent={editTarget?.content || ""}
+        initialImages={editTarget?.images}
         onSave={handleEditSave}
         onCancel={() => setEditTarget(null)}
       />
@@ -1355,7 +1741,27 @@ export default function CommentPanel({
         message="确认要删除此评论吗？评论和场景中的 annotation 将被一起移除。"
         confirmLabel="删除"
         onConfirm={handleDeleteComment}
-        onCancel={() => setDeleteCommentTarget(null)}
+        onCancel={() => {
+          setDeleteCommentTarget(null);
+          setAnnotationAction(null); // 取消也清理
+        }}
+      />
+      <ConfirmDialog
+        open={!!replyDeleteTarget}
+        title="删除回复"
+        message="确认要删除此回复吗？"
+        confirmLabel="删除"
+        onConfirm={handleDeleteReplyConfirm}
+        onCancel={() => setReplyDeleteTarget(null)}
+      />
+      <EditDialog
+        key={replyEditTarget?._id || "reply-edit-closed"}
+        open={!!replyEditTarget}
+        initialContent={replyEditTarget?.content || ""}
+        initialImages={replyEditTarget?.images}
+        onSave={handleEditReplySave}
+        onCancel={() => setReplyEditTarget(null)}
+        title="编辑回复"
       />
       <ConfirmDialog
         open={!!moveTarget}

@@ -55,6 +55,8 @@ export interface CommentItem {
   dislikes: number;
   /** 踩用户 ID 列表 */
   dislikedBy: string[];
+  /** 是否为管理员精选的"优"回复 */
+  isBest?: boolean;
   /** 回复附带的图片（base64 缩略图，<20KB，最多 2 张） */
   images?: string[];
   /** 创建时间 ISO 字符串 */

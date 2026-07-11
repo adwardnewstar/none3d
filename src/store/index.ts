@@ -2,7 +2,14 @@ import { create } from "zustand";
 import type { AppItem } from "@/types";
 
 interface AnnotationAction {
-  type: "like" | "dislike" | "reply" | "delete";
+  type:
+    | "like"
+    | "dislike"
+    | "reply"
+    | "delete"
+    | "like-reply"
+    | "dislike-reply"
+    | "delete-reply";
   commentId: string;
   text?: string;
   images?: string[];

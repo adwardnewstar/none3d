@@ -73,7 +73,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#0a0e27]">
       {/* 头部 */}
-      <header className="relative overflow-hidden border-b border-white/5 px-6 py-12">
+      <header className="relative border-b border-white/5 px-6 py-12">
         <div className="absolute inset-0 bg-gradient-to-b from-[#00d4ff]/5 to-transparent" />
         <div className="relative mx-auto max-w-7xl flex items-center justify-between">
           <div>

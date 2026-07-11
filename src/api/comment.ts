@@ -19,6 +19,7 @@ function mapComment(row: any): CommentItem {
     likedBy: row.liked_by || [],
     dislikes: row.dislikes,
     dislikedBy: row.disliked_by || [],
+    isBest: row.is_best || false,
     images: row.images || [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -87,11 +88,19 @@ export async function addComment(
 export async function updateComment(
   commentId: string,
   content: string,
+  images?: string[],
 ): Promise<boolean> {
   try {
+    const updateData: Record<string, unknown> = {
+      content: content.trim(),
+      updated_at: new Date().toISOString(),
+    };
+    if (images !== undefined) {
+      updateData.images = images;
+    }
     const { error } = await supabase
       .from("n3d_comments")
-      .update({ content: content.trim(), updated_at: new Date().toISOString() })
+      .update(updateData)
       .eq("id", commentId);
 
     if (error) throw error;
@@ -241,6 +250,27 @@ export async function toggleDislike(
     return true;
   } catch (e) {
     console.error("切换踩失败:", e);
+    return false;
+  }
+}
+
+/** 切换"优"状态（仅管理员可用） */
+export async function toggleBest(
+  commentId: string,
+  currentlyBest: boolean,
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("n3d_comments")
+      .update({
+        is_best: !currentlyBest,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", commentId);
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.error("切换优状态失败:", e);
     return false;
   }
 }

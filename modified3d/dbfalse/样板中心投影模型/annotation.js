@@ -57,18 +57,24 @@
       "}" +
       /* 悬停弹窗卡片 */
       ".ann-hover-card {" +
-      "  padding: 3px 8px;" +
+      "  padding: 3px;" +
       "  min-width: 200px;" +
       "  max-width: 260px;" +
       "}" +
       /* dialog 头部行：用户名 日期 X */
       ".ann-dialog-header {" +
       "  display: flex;" +
-      "  align-items: center;" +
-      "  gap: 6px;" +
-      "  padding: 4px 0;" +
+      "  flex-direction: column;" +
+      "  gap: 1px;" +
+      "  padding: 0;" +
       "  border-bottom: 1px solid rgba(255,255,255,0.15);" +
       "  margin-bottom: 4px;" +
+      "  text-align: left;" +
+      "}" +
+      ".ann-dialog-header-top {" +
+      "  display: flex;" +
+      "  align-items: center;" +
+      "  justify-content: space-between;" +
       "}" +
       ".ann-dialog-nickname {" +
       "  font-size: 12px;" +
@@ -76,10 +82,28 @@
       "  color: #e5e7eb;" +
       "  white-space: nowrap;" +
       "}" +
+      ".ann-dialog-date-row {" +
+      "  display: flex;" +
+      "  align-items: center;" +
+      "  justify-content: space-between;" +
+      "}" +
       ".ann-dialog-date {" +
       "  font-size: 10px;" +
       "  color: #9ca3af;" +
       "  white-space: nowrap;" +
+      "  text-align: left;" +
+      "}" +
+      ".ann-dialog-date-more {" +
+      "  background: none;" +
+      "  border: none;" +
+      "  color: #9ca3af;" +
+      "  font-size: 14px;" +
+      "  line-height: 1;" +
+      "  cursor: pointer;" +
+      "  padding: 0 2px;" +
+      "}" +
+      ".ann-dialog-date-more:hover {" +
+      "  color: #e5e7eb;" +
       "}" +
       ".ann-dialog-close {" +
       "  margin-left: auto;" +
@@ -87,7 +111,7 @@
       "  border: none;" +
       "  color: #9ca3af;" +
       "  cursor: pointer;" +
-      "  font-size: 14px;" +
+      "  font-size: 12px;" +
       "  line-height: 1;" +
       "  padding: 0 2px;" +
       "  transition: color 0.15s;" +
@@ -125,6 +149,13 @@
       ".ann-like:hover { color: #e74c3c; }" +
       ".ann-dislike:hover { color: #e67e22; }" +
       ".ann-reply:hover { color: #3498db; }" +
+      ".ann-dialog-focus {" +
+      "  margin-left: auto;" +
+      "  color: #9ca3af;" +
+      "  font-size: 16px;" +
+      "  line-height: 1;" +
+      "}" +
+      ".ann-dialog-focus:hover { color: #e5e7eb; }" +
       ".ann-hover-reply {" +
       "  margin-top: 6px;" +
       "}" +
@@ -211,8 +242,7 @@
       /* 回复列表 */
       ".ann-replies {" +
       "  margin: 4px 0;" +
-      "  max-height: 120px;" +
-      "  overflow-y: auto;" +
+      "  padding-left: 1em;" +
       "}" +
       ".ann-reply-item {" +
       "  display: flex;" +
@@ -226,18 +256,31 @@
       "  color: #93c5fd;" +
       "  white-space: nowrap;" +
       "  font-weight: 500;" +
+      "  text-align: left;" +
       "}" +
       ".ann-reply-text {" +
       "  color: #fff;" +
       "  word-break: break-all;" +
+      "  text-align: left;" +
+      "}" +
+      ".ann-reply-actions {" +
+      "  display: flex;" +
+      "  gap: 6px;" +
+      "  align-items: center;" +
+      "  margin-top: 2px;" +
+      "}" +
+      ".ann-reply-actions .ann-btn {" +
+      "  font-size: 11px;" +
+      "  padding: 1px 3px;" +
       "}" +
       /* dialog：顶部与 annotation 对齐 + 一字间隙 + 圆角 5px */
       ".v3d-annotation-dialog {" +
       "  position: absolute !important;" +
-      "  top: 0 !important;" +
+      "  top: -1px !important;" +
       "  left: calc(100% + 1em) !important;" +
       "  margin: 0 !important;" +
       "  border-radius: 5px !important;" +
+      "  border: 2px solid rgba(255,255,255,0.7) !important;" +
       "  overflow: hidden !important;" +
       "}" +
       /* 悬停时 label 变正方形（不改变尺寸，只改圆角） */
@@ -270,6 +313,20 @@
       "  max-height: 90vh;" +
       "  border-radius: 4px;" +
       "  box-shadow: 0 4px 20px rgba(0,0,0,0.5);" +
+      "}" +
+      ".ann-replies-toggle {" +
+      "  background: none;" +
+      "  border: none;" +
+      "  color: #3b82f6;" +
+      "  cursor: pointer;" +
+      "  font-size: 11px;" +
+      "  padding: 4px 0;" +
+      "  width: 100%;" +
+      "  text-align: left;" +
+      "  transition: color 0.15s;" +
+      "}" +
+      ".ann-replies-toggle:hover {" +
+      "  color: #60a5fa;" +
       "}";
     document.head.appendChild(css);
   })();
@@ -328,6 +385,9 @@
         case "annotation-add-reply":
           handleAddReply(app, msg);
           break;
+        case "annotation-update-reply":
+          handleUpdateReply(app, msg);
+          break;
         case "show-annotations":
         case "hide-annotations":
           setAllAnnotationsVisible(app, msg.type === "show-annotations");
@@ -335,6 +395,37 @@
         case "show-coordinates":
         case "hide-coordinates":
           setMarkerGroupVisible(app, msg.type === "show-coordinates");
+          break;
+        case "set-active-axis":
+          if (app.ExternalInterface && app.ExternalInterface.setDragAxis) {
+            app.ExternalInterface.setDragAxis(msg.axis || null);
+          }
+          break;
+
+        case "set-axis-edge-glow":
+          console.log(
+            "[Annotation] set-axis-edge-glow received, axis:",
+            msg.axis,
+          );
+          if (!app.postprocessing || !app.postprocessing.outlinePass) {
+            console.log("[Annotation] outlinePass not available");
+            break;
+          }
+          var oa = app.postprocessing.outlinePass.selectedObjects;
+          var markers = ["标记X", "标记Y", "标记Z"];
+          var glowAxis = msg.axis ? "标记" + msg.axis.toUpperCase() : null;
+          for (var gmi = 0; gmi < markers.length; gmi++) {
+            var obj = app.scene.getObjectByName(markers[gmi]);
+            if (!obj) continue;
+            var idx = oa.indexOf(obj);
+            if (markers[gmi] === glowAxis) {
+              if (idx === -1) oa.push(obj);
+              console.log("[Annotation] ENABLE outline for", markers[gmi]);
+            } else {
+              if (idx > -1) oa.splice(idx, 1);
+              console.log("[Annotation] DISABLE outline for", markers[gmi]);
+            }
+          }
           break;
       }
     });
@@ -408,6 +499,7 @@
     replyCount = typeof replyCount === "number" ? replyCount : 0;
     replies = replies || [];
     nickname = nickname || "匿名用户";
+    if (nickname.length > 8) nickname = nickname.substring(0, 8) + "...";
     images = images || [];
     var dateStr = "";
     if (createdAt) {
@@ -419,30 +511,85 @@
       dateStr = month + "/" + day + " " + hour + ":" + min;
     }
 
-    var repliesHtml = "";
-    for (var i = 0; i < replies.length; i++) {
-      var r = replies[i];
-      repliesHtml += '<div class="ann-reply-item">';
-      repliesHtml += '<div style="display:flex;gap:6px;align-items:center">';
-      repliesHtml +=
-        '<span class="ann-reply-author">' +
+    // 与侧边栏一致：按点赞降序→时间升序排序，默认只显示最后一条
+    var sortedReplies = replies.slice();
+    sortedReplies.sort(function (a, b) {
+      var likesA = a.likes || 0;
+      var likesB = b.likes || 0;
+      if (likesB !== likesA) return likesB - likesA;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+    var totalReplies = sortedReplies.length;
+    var defaultReplies = sortedReplies.slice(-1);
+
+    function buildReplyItemHtml(r) {
+      var likedAttr =
+        r.likedBy && Array.isArray(r.likedBy) && r.likedBy.length > 0
+          ? "true"
+          : "false";
+      var dislikedAttr =
+        r.dislikedBy && Array.isArray(r.dislikedBy) && r.dislikedBy.length > 0
+          ? "true"
+          : "false";
+      var html = '<div class="ann-reply-item">';
+      html +=
+        '<div class="ann-reply-author">' +
         escapeHtml(r.nickname || "") +
-        "</span>";
-      repliesHtml +=
-        '<span class="ann-reply-text">' +
-        escapeHtml(r.content || "") +
-        "</span>";
-      repliesHtml += "</div>";
+        "</div>";
+      html +=
+        '<div class="ann-reply-text">' + escapeHtml(r.content || "") + "</div>";
       if (r.images && r.images.length > 0) {
-        repliesHtml +=
+        html +=
           '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:2px">';
         for (var ri = 0; ri < r.images.length; ri++) {
-          repliesHtml +=
-            '<img src="' + r.images[ri] + '" class="ann-reply-img" />';
+          html += '<img src="' + r.images[ri] + '" class="ann-reply-img" />';
         }
-        repliesHtml += "</div>";
+        html += "</div>";
       }
-      repliesHtml += "</div>";
+      html +=
+        '<div class="ann-reply-actions">' +
+        '<button class="ann-btn ann-reply-like" data-comment-id="' +
+        r._id +
+        '" data-liked="' +
+        likedAttr +
+        '">' +
+        SVG_HEART +
+        " " +
+        (r.likes || 0) +
+        "</button>" +
+        '<button class="ann-btn ann-reply-dislike" data-comment-id="' +
+        r._id +
+        '" data-disliked="' +
+        dislikedAttr +
+        '">' +
+        SVG_DISLIKE +
+        " " +
+        (r.dislikes || 0) +
+        "</button>" +
+        "</div>";
+      html += "</div>";
+      return html;
+    }
+
+    var repliesHtml = "";
+    // 默认只显示最后一条（与侧边栏 slice(-1) 一致）
+    for (var di = 0; di < defaultReplies.length; di++) {
+      repliesHtml += buildReplyItemHtml(defaultReplies[di]);
+    }
+    // 多余回复放入隐藏容器
+    var extrasHtml = "";
+    for (var ei = 0; ei < sortedReplies.length - 1; ei++) {
+      extrasHtml += buildReplyItemHtml(sortedReplies[ei]);
+    }
+    if (extrasHtml) {
+      repliesHtml +=
+        '<div class="ann-replies-extras" style="display:none">' +
+        extrasHtml +
+        "</div>";
+      repliesHtml +=
+        '<button class="ann-replies-toggle" data-expanded="false">共 ' +
+        totalReplies +
+        " 条回复</button>";
     }
 
     var imagesHtml = "";
@@ -461,15 +608,17 @@
       commentId +
       '">' +
       '<div class="ann-dialog-header">' +
+      '<div class="ann-dialog-header-top">' +
       '<span class="ann-dialog-nickname">' +
       escapeHtml(nickname) +
       "</span>" +
+      '<button class="ann-dialog-close" data-comment-id="' +
+      commentId +
+      '">x</button>' +
+      "</div>" +
       '<span class="ann-dialog-date">' +
       dateStr +
       "</span>" +
-      '<button class="ann-dialog-close" data-comment-id="' +
-      commentId +
-      '">&#x2716;</button>' +
       "</div>" +
       '<div class="ann-hover-content">' +
       escapeHtml(content || "") +
@@ -483,23 +632,26 @@
       commentId +
       '" data-liked="false">' +
       SVG_HEART +
-      " 赞 " +
+      " " +
       likes +
       "</button>" +
       '<button class="ann-btn ann-dislike" data-comment-id="' +
       commentId +
       '" data-disliked="false">' +
       SVG_DISLIKE +
-      " 踩 " +
+      " " +
       dislikes +
       "</button>" +
       '<button class="ann-btn ann-reply" data-comment-id="' +
       commentId +
       '">' +
       SVG_REPLY +
-      " 回复 " +
+      " " +
       replyCount +
       "</button>" +
+      '<button class="ann-btn ann-dialog-focus" data-comment-id="' +
+      commentId +
+      '">···</button>' +
       "</div>" +
       '<div class="ann-hover-reply" style="display:none">' +
       '<div class="ann-reply-preview" style="display:none"></div>' +
@@ -526,6 +678,11 @@
     if (!label) return;
 
     var originalChar = annotation.character || "";
+    // 从 DOM 读取实际原始字符（某些 Verge3D 版本不暴露 .character 属性）
+    var textEl = label.querySelector(".v3d-annotation-text");
+    var domChar = textEl ? textEl.textContent : originalChar;
+    // 存到 label 的 dataset 上，供 for 循环关闭其他标注时用
+    label.dataset.originalChar = domChar;
     // 用 dataset 独立跟踪 dialog 状态（不依赖 Verge3D 内部实现）
     label.dataset.annOpen = "false";
 
@@ -559,14 +716,53 @@
     // ---- 点击：让 Verge3D toggle dialog，我们自己跟踪状态 ----
     label.addEventListener("click", function (e) {
       e.stopPropagation();
-      // 切换状态
+      // 如果当前要打开，先关闭所有其他打开的 annotation
       var nowOpen = label.dataset.annOpen !== "true";
+      if (nowOpen) {
+        for (var id in annotations) {
+          if (annotations.hasOwnProperty(id) && id !== commentId) {
+            var other = annotations[id];
+            var otherLabel = other.annotation;
+            if (otherLabel && otherLabel.dataset.annOpen === "true") {
+              otherLabel.dataset.annOpen = "false";
+              // 用和 setText 相同的逻辑设置文字（querySelector 找不到时 fallback 到文本节点）
+              var oTextEl = otherLabel.querySelector(".v3d-annotation-text");
+              if (oTextEl) {
+                oTextEl.textContent = otherLabel.dataset.originalChar || "";
+              } else {
+                for (var ni = 0; ni < otherLabel.childNodes.length; ni++) {
+                  var n = otherLabel.childNodes[ni];
+                  if (n.nodeType === 3) {
+                    n.textContent = otherLabel.dataset.originalChar || "";
+                    break;
+                  }
+                }
+              }
+              otherLabel.classList.remove("ann-hovered");
+            }
+          }
+        }
+      }
       label.dataset.annOpen = nowOpen ? "true" : "false";
 
       if (nowOpen) {
         setText("−");
         label.classList.add("ann-hovered");
+        // 直接显示内容框
+        var dlg = annotation.annotationDialog;
+        if (dlg) {
+          dlg.style.visibility = "visible";
+          dlg.style.setProperty("display", "block", "important");
+        }
+        annotation.annotationDialogVisible = true;
       } else {
+        // 直接隐藏内容框
+        var dlg = annotation.annotationDialog;
+        if (dlg) {
+          dlg.style.visibility = "hidden";
+          dlg.style.display = "";
+        }
+        annotation.annotationDialogVisible = false;
         setText(originalChar);
         label.classList.remove("ann-hovered");
       }
@@ -586,7 +782,19 @@
     if (!dialog) return;
 
     annotation._dialogDelegation = function (event) {
+      event.stopPropagation();
       var target = event.target;
+      // 如果点了 SVG 图标内部，向上找到按钮
+      if (target.tagName === "path" || target.tagName === "svg") {
+        var btn = target.closest("button");
+        if (btn) target = btn;
+      }
+
+      // 点击菜单外部时关闭更多菜单
+      var openMenu = dialog.querySelector(".ann-dialog-more-menu");
+      if (openMenu) {
+        openMenu.remove();
+      }
 
       // ❤ 点赞
       if (target.classList.contains("ann-like")) {
@@ -597,7 +805,7 @@
 
         if (liked) {
           target.setAttribute("data-liked", "false");
-          target.innerHTML = SVG_HEART + " 赞 " + Math.max(0, count - 1);
+          target.innerHTML = SVG_HEART + " " + Math.max(0, count - 1);
         } else {
           // 如果之前是踩的状态，清除踩
           var dislikeBtn = dialog.querySelector(".ann-dislike");
@@ -608,11 +816,10 @@
             dislikeBtn.setAttribute("data-disliked", "false");
             var dMatch = dislikeBtn.textContent.match(/\d+/);
             var dCount = dMatch ? parseInt(dMatch[0], 10) : 0;
-            dislikeBtn.innerHTML =
-              SVG_DISLIKE + " 踩 " + Math.max(0, dCount - 1);
+            dislikeBtn.innerHTML = SVG_DISLIKE + " " + Math.max(0, dCount - 1);
           }
           target.setAttribute("data-liked", "true");
-          target.innerHTML = SVG_HEART_FILLED + " 赞 " + (count + 1);
+          target.innerHTML = SVG_HEART_FILLED + " " + (count + 1);
         }
 
         window.parent.postMessage(
@@ -635,7 +842,7 @@
 
         if (disliked) {
           target.setAttribute("data-disliked", "false");
-          target.innerHTML = SVG_DISLIKE + " 踩 " + Math.max(0, count - 1);
+          target.innerHTML = SVG_DISLIKE + " " + Math.max(0, count - 1);
         } else {
           // 如果之前是赞的状态，清除赞
           var likeBtn = dialog.querySelector(".ann-like");
@@ -643,10 +850,10 @@
             likeBtn.setAttribute("data-liked", "false");
             var lMatch = likeBtn.textContent.match(/\d+/);
             var lCount = lMatch ? parseInt(lMatch[0], 10) : 0;
-            likeBtn.innerHTML = SVG_HEART + " 赞 " + Math.max(0, lCount - 1);
+            likeBtn.innerHTML = SVG_HEART + " " + Math.max(0, lCount - 1);
           }
           target.setAttribute("data-disliked", "true");
-          target.innerHTML = SVG_DISLIKE + " 踩 " + (count + 1);
+          target.innerHTML = SVG_DISLIKE + " " + (count + 1);
         }
 
         window.parent.postMessage(
@@ -660,16 +867,17 @@
         return;
       }
 
-      // 💬 回复按钮
+      // 💬 回复按钮（切换回复输入栏）
       if (target.classList.contains("ann-reply")) {
         event.stopPropagation();
         var replySection = dialog.querySelector(".ann-hover-reply");
-        if (replySection) {
+        if (!replySection) return;
+        if (replySection.style.display === "flex") {
+          replySection.style.display = "none";
+        } else {
           replySection.style.display = "flex";
           var input = replySection.querySelector(".ann-reply-input");
-          if (input) {
-            input.focus();
-          }
+          if (input) input.focus();
         }
         return;
       }
@@ -770,6 +978,132 @@
         return; // 由 change 事件处理
       }
 
+      // === 回复按钮：❤ 赞 ===
+      if (target.classList.contains("ann-reply-like")) {
+        event.stopPropagation();
+        var rLiked = target.getAttribute("data-liked") === "true";
+        var rMatch = target.textContent.match(/\d+/);
+        var rCount = rMatch ? parseInt(rMatch[0], 10) : 0;
+        if (rLiked) {
+          target.setAttribute("data-liked", "false");
+          target.innerHTML = SVG_HEART + " " + Math.max(0, rCount - 1);
+        } else {
+          // 如果已踩，清除踩
+          var parentItem = target.closest(".ann-reply-item");
+          if (parentItem) {
+            var rDislike = parentItem.querySelector(".ann-reply-dislike");
+            if (rDislike && rDislike.getAttribute("data-disliked") === "true") {
+              rDislike.setAttribute("data-disliked", "false");
+              var rdMatch = rDislike.textContent.match(/\d+/);
+              var rdCount = rdMatch ? parseInt(rdMatch[0], 10) : 0;
+              rDislike.innerHTML = SVG_DISLIKE + " " + Math.max(0, rdCount - 1);
+            }
+          }
+          target.setAttribute("data-liked", "true");
+          target.innerHTML = SVG_HEART_FILLED + " " + (rCount + 1);
+        }
+        window.parent.postMessage(
+          {
+            type: "annotation-action",
+            action: "like-reply",
+            commentId: target.getAttribute("data-comment-id"),
+          },
+          "*",
+        );
+        return;
+      }
+
+      // === 回复按钮：👍 踩 ===
+      if (target.classList.contains("ann-reply-dislike")) {
+        event.stopPropagation();
+        var rDisliked = target.getAttribute("data-disliked") === "true";
+        var rdMatch = target.textContent.match(/\d+/);
+        var rdCount = rdMatch ? parseInt(rdMatch[0], 10) : 0;
+        if (rDisliked) {
+          target.setAttribute("data-disliked", "false");
+          target.innerHTML = SVG_DISLIKE + " " + Math.max(0, rdCount - 1);
+        } else {
+          var parentItem = target.closest(".ann-reply-item");
+          if (parentItem) {
+            var rLike = parentItem.querySelector(".ann-reply-like");
+            if (rLike && rLike.getAttribute("data-liked") === "true") {
+              rLike.setAttribute("data-liked", "false");
+              var rlMatch = rLike.textContent.match(/\d+/);
+              var rlCount = rlMatch ? parseInt(rlMatch[0], 10) : 0;
+              rLike.innerHTML = SVG_HEART + " " + Math.max(0, rlCount - 1);
+            }
+          }
+          target.setAttribute("data-disliked", "true");
+          target.innerHTML = SVG_DISLIKE + " " + (rdCount + 1);
+        }
+        window.parent.postMessage(
+          {
+            type: "annotation-action",
+            action: "dislike-reply",
+            commentId: target.getAttribute("data-comment-id"),
+          },
+          "*",
+        );
+        return;
+      }
+
+      // === 回复按钮：× 删除（带确认弹框） ===
+      if (target.classList.contains("ann-reply-delete")) {
+        event.stopPropagation();
+        if (!confirm("确定删除此回复？")) return;
+        window.parent.postMessage(
+          {
+            type: "annotation-action",
+            action: "delete-reply",
+            commentId: target.getAttribute("data-comment-id"),
+          },
+          "*",
+        );
+        return;
+      }
+
+      // === 回复按钮：··· 聚焦侧边栏 ===
+      if (target.classList.contains("ann-reply-focus")) {
+        event.stopPropagation();
+        var rfFocused = target.getAttribute("data-focus-active") === "true";
+        if (rfFocused) {
+          target.setAttribute("data-focus-active", "false");
+          window.parent.postMessage(
+            {
+              type: "annotation-action",
+              action: "unfocus-comment",
+              commentId: target.getAttribute("data-comment-id"),
+            },
+            "*",
+          );
+        } else {
+          target.setAttribute("data-focus-active", "true");
+          window.parent.postMessage(
+            {
+              type: "annotation-action",
+              action: "focus-comment",
+              commentId: target.getAttribute("data-comment-id"),
+            },
+            "*",
+          );
+        }
+        return;
+      }
+
+      // === 回复展开/收起按钮（呼出侧边评论栏） ===
+      if (target.classList.contains("ann-replies-toggle")) {
+        event.stopPropagation();
+        window.parent.postMessage(
+          {
+            type: "annotation-action",
+            action: "focus-comment-and-expand",
+            commentId: commentId,
+          },
+          "*",
+        );
+        return;
+      }
+
       // 图片点击放大
       if (target.classList.contains("ann-reply-img")) {
         event.stopPropagation();
@@ -788,17 +1122,68 @@
         return;
       }
 
-      // X 删除按钮
+      // 关闭按钮（退场动画 + 隐藏 dialog + 更新 Verge3D 内部状态）
       if (target.classList.contains("ann-dialog-close")) {
         event.stopPropagation();
-        window.parent.postMessage(
-          {
-            type: "annotation-action",
-            action: "delete",
-            commentId: commentId,
-          },
-          "*",
-        );
+        // 用 inline transition 做退场动画，防止 Verge3D display:none 打断
+        dialog.style.setProperty("display", "block", "important");
+        dialog.style.transition = "opacity 0.2s ease, transform 0.2s ease";
+        dialog.style.opacity = "0";
+        dialog.style.transform = "translateX(-12px)";
+        setTimeout(function () {
+          dialog.style.transition = "";
+          dialog.style.transform = "";
+          dialog.style.opacity = "";
+          dialog.style.display = "";
+          var closeLabel = annotation.annotation;
+          if (closeLabel) {
+            closeLabel.dataset.annOpen = "false";
+            var ctEl = closeLabel.querySelector(".v3d-annotation-text");
+            if (ctEl) {
+              ctEl.textContent = closeLabel.dataset.originalChar || "";
+            } else {
+              for (var cni = 0; cni < closeLabel.childNodes.length; cni++) {
+                var cn = closeLabel.childNodes[cni];
+                if (cn.nodeType === 3) {
+                  cn.textContent = closeLabel.dataset.originalChar || "";
+                  break;
+                }
+              }
+            }
+            closeLabel.classList.remove("ann-hovered");
+          }
+          // 同步 Verge3D 内部状态，防止渲染循环恢复可见
+          annotation.annotationDialogVisible = false;
+          dialog.style.visibility = "hidden";
+        }, 200);
+        return;
+      }
+
+      // ··· 按钮（切换侧边栏展开/折叠）
+      if (target.classList.contains("ann-dialog-focus")) {
+        event.stopPropagation();
+        var focused = target.getAttribute("data-focus-active") === "true";
+        if (focused) {
+          target.setAttribute("data-focus-active", "false");
+          window.parent.postMessage(
+            {
+              type: "annotation-action",
+              action: "unfocus-comment",
+              commentId: commentId,
+            },
+            "*",
+          );
+        } else {
+          target.setAttribute("data-focus-active", "true");
+          window.parent.postMessage(
+            {
+              type: "annotation-action",
+              action: "focus-comment",
+              commentId: commentId,
+            },
+            "*",
+          );
+        }
         return;
       }
     };
@@ -964,6 +1349,7 @@
       app.scene.add(annotation);
 
       annotations[msg.commentId] = annotation;
+      annotation._replies = msg.replies || [];
 
       addHoverHandlers(annotation, msg.commentId);
       addDialogEventDelegation(annotation, msg.commentId);
@@ -1007,21 +1393,21 @@
           if (likeBtn) {
             var liked = likeBtn.getAttribute("data-liked") === "true";
             likeBtn.innerHTML =
-              (liked ? SVG_HEART_FILLED : SVG_HEART) + " 赞 " + msg.likes;
+              (liked ? SVG_HEART_FILLED : SVG_HEART) + " " + msg.likes;
           }
         }
         if (typeof msg.dislikes === "number") {
           var dislikeBtn =
             annotation.annotationDialog.querySelector(".ann-dislike");
           if (dislikeBtn) {
-            dislikeBtn.innerHTML = SVG_DISLIKE + " 踩 " + msg.dislikes;
+            dislikeBtn.innerHTML = SVG_DISLIKE + " " + msg.dislikes;
           }
         }
         if (typeof msg.replyCount === "number") {
           var replyBtn =
             annotation.annotationDialog.querySelector(".ann-reply");
           if (replyBtn) {
-            replyBtn.innerHTML = SVG_REPLY + " 回复 " + msg.replyCount;
+            replyBtn.innerHTML = SVG_REPLY + " " + msg.replyCount;
           }
         }
       } else {
@@ -1071,7 +1457,7 @@
           msg.userLiked === true ||
           likeBtn.getAttribute("data-liked") === "true";
         likeBtn.innerHTML =
-          (liked ? SVG_HEART_FILLED : SVG_HEART) + " 赞 " + msg.likes;
+          (liked ? SVG_HEART_FILLED : SVG_HEART) + " " + msg.likes;
         if (typeof msg.userLiked === "boolean") {
           likeBtn.setAttribute("data-liked", String(msg.userLiked));
         }
@@ -1081,7 +1467,7 @@
       var dislikeBtn =
         annotation.annotationDialog.querySelector(".ann-dislike");
       if (dislikeBtn) {
-        dislikeBtn.innerHTML = SVG_DISLIKE + " 踩 " + msg.dislikes;
+        dislikeBtn.innerHTML = SVG_DISLIKE + " " + msg.dislikes;
         if (typeof msg.userDisliked === "boolean") {
           dislikeBtn.setAttribute("data-disliked", String(msg.userDisliked));
         }
@@ -1090,7 +1476,7 @@
     if (typeof msg.replyCount === "number") {
       var replyBtn = annotation.annotationDialog.querySelector(".ann-reply");
       if (replyBtn) {
-        replyBtn.innerHTML = SVG_REPLY + " 回复 " + msg.replyCount;
+        replyBtn.innerHTML = SVG_REPLY + " " + msg.replyCount;
       }
     }
   }
@@ -1107,17 +1493,15 @@
       annotation.annotationDialog.querySelector(".ann-replies");
     if (!repliesContainer) return;
 
-    // 追加回复项
+    // 创建新回复项
     var replyItem = document.createElement("div");
     replyItem.className = "ann-reply-item";
     var innerHtml =
-      '<div style="display:flex;gap:6px;align-items:center">' +
-      '<span class="ann-reply-author">' +
+      '<div class="ann-reply-author">' +
       escapeHtml(msg.nickname || "") +
-      "</span>" +
-      '<span class="ann-reply-text">' +
+      "</div>" +
+      '<div class="ann-reply-text">' +
       escapeHtml(msg.content || "") +
-      "</span>" +
       "</div>";
     if (msg.images && msg.images.length > 0) {
       innerHtml +=
@@ -1128,14 +1512,152 @@
       }
       innerHtml += "</div>";
     }
+    innerHtml +=
+      '<div class="ann-reply-actions">' +
+      '<button class="ann-btn ann-reply-like" data-comment-id="' +
+      msg._id +
+      '" data-liked="false">' +
+      SVG_HEART +
+      " 0</button>" +
+      '<button class="ann-btn ann-reply-dislike" data-comment-id="' +
+      msg._id +
+      '" data-disliked="false">' +
+      SVG_DISLIKE +
+      " 0</button>" +
+      "</div>";
     replyItem.innerHTML = innerHtml;
     repliesContainer.appendChild(replyItem);
 
-    // 同步更新回复按钮计数
+    // 同步到 _replies 数据
+    if (annotation._replies) {
+      annotation._replies.push({
+        _id: msg._id || "",
+        nickname: msg.nickname || "",
+        content: msg.content || "",
+        likes: 0,
+        dislikes: 0,
+        createdAt: new Date().toISOString(),
+        isBest: false,
+        images: msg.images || [],
+      });
+    }
+
+    // 创建/更新 toggle 按钮
+    var allItems = repliesContainer.querySelectorAll(".ann-reply-item");
+    var toggle = repliesContainer.querySelector(".ann-replies-toggle");
+    if (allItems.length >= 2 && !toggle) {
+      toggle = document.createElement("button");
+      toggle.className = "ann-replies-toggle";
+      toggle.textContent = "共 " + allItems.length + " 条回复";
+      repliesContainer.parentNode.appendChild(toggle);
+    } else if (toggle) {
+      toggle.textContent = "共 " + allItems.length + " 条回复";
+    }
+
+    // 同步更新主回复按钮计数
     if (typeof msg.replyCount === "number") {
       var replyBtn = annotation.annotationDialog.querySelector(".ann-reply");
       if (replyBtn) {
-        replyBtn.innerHTML = SVG_REPLY + " 回复 " + msg.replyCount;
+        replyBtn.innerHTML = SVG_REPLY + " " + msg.replyCount;
+      }
+    }
+  }
+
+  // ==============================
+  //  重建折叠预览（优 > 赞多 > 最新）
+  // ==============================
+  function rebuildAnnotationReplies(annotation) {
+    if (!annotation || !annotation.annotationDialog || !annotation._replies)
+      return;
+    var replies = annotation._replies;
+    var totalReplies = replies.length;
+    var container = annotation.annotationDialog.querySelector(".ann-replies");
+    if (!container) return;
+
+    var html = "";
+    if (totalReplies > 0) {
+      var bestReply = (function () {
+        var bestReplies = [];
+        for (var br = 0; br < replies.length; br++) {
+          if (replies[br].isBest) bestReplies.push(replies[br]);
+        }
+        if (bestReplies.length > 0) {
+          bestReplies.sort(function (a, b) {
+            if ((b.likes || 0) !== (a.likes || 0))
+              return (b.likes || 0) - (a.likes || 0);
+            return (
+              new Date(b.createdAt || 0).getTime() -
+              new Date(a.createdAt || 0).getTime()
+            );
+          });
+          return bestReplies[0];
+        }
+        var sorted = [].concat(replies);
+        sorted.sort(function (a, b) {
+          if ((b.likes || 0) !== (a.likes || 0))
+            return (b.likes || 0) - (a.likes || 0);
+          return (
+            new Date(b.createdAt || 0).getTime() -
+            new Date(a.createdAt || 0).getTime()
+          );
+        });
+        return sorted[0];
+      })();
+      var r = bestReply;
+      var rid = r._id || "";
+      html =
+        '<div class="ann-reply-item"' +
+        (rid ? ' data-reply-id="' + rid + '"' : "") +
+        '><div class="ann-reply-author">' +
+        escapeHtml(r.nickname || "") +
+        '</div><div class="ann-reply-text">' +
+        escapeHtml(r.content || "") +
+        "</div>";
+      if (r.images && r.images.length > 0) {
+        html +=
+          '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:2px">';
+        for (var ri = 0; ri < r.images.length; ri++) {
+          html += '<img src="' + r.images[ri] + '" class="ann-reply-img" />';
+        }
+        html += "</div>";
+      }
+      html += "</div>";
+    }
+    container.innerHTML = html;
+  }
+
+  // ==============================
+  //  更新回复（赞/踩/优同步）
+  // ==============================
+  function handleUpdateReply(app, msg) {
+    var annotation = annotations[msg.commentId];
+    if (!annotation) return;
+    if (!annotation.annotationDialog) return;
+    if (!annotation._replies) return;
+
+    var found = false;
+    for (var ri = 0; ri < annotation._replies.length; ri++) {
+      if (annotation._replies[ri]._id === msg.replyId) {
+        if (typeof msg.isBest === "boolean")
+          annotation._replies[ri].isBest = msg.isBest;
+        if (typeof msg.likes === "number")
+          annotation._replies[ri].likes = msg.likes;
+        if (typeof msg.dislikes === "number")
+          annotation._replies[ri].dislikes = msg.dislikes;
+        if (typeof msg.content === "string")
+          annotation._replies[ri].content = msg.content;
+        found = true;
+        break;
+      }
+    }
+
+    if (found) {
+      rebuildAnnotationReplies(annotation);
+      var toggle = annotation.annotationDialog.querySelector(
+        ".ann-replies-toggle",
+      );
+      if (toggle && annotation._replies.length > 1) {
+        toggle.textContent = "共 " + annotation._replies.length + " 条回复";
       }
     }
   }
@@ -1239,11 +1761,9 @@
 
   /** 显示/隐藏所有 annotation */
   function setAllAnnotationsVisible(app, visible) {
-    for (var key in annotations) {
-      if (annotations.hasOwnProperty(key)) {
-        var ann = annotations[key];
-        ann.visible = visible;
-      }
+    var anns = app.container.querySelectorAll(".v3d-annotation");
+    for (var i = 0; i < anns.length; i++) {
+      anns[i].style.display = visible ? "" : "none";
     }
   }
 
@@ -1471,4 +1991,3 @@
     reader.readAsDataURL(file);
   }
 })();
-
