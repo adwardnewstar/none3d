@@ -12,7 +12,7 @@ import {
   PanelLeftClose,
 } from "lucide-react";
 import { useAppStore, useUserStore } from "@/store";
-import { addComment } from "@/api/comment";
+import { addComment, queryComments } from "@/api/comment";
 import { compressImage } from "@/utils/imageCompress";
 import CommentPanel from "./CommentPanel";
 
@@ -65,6 +65,35 @@ export default function AppViewer() {
     }
   }, []);
 
+  // ref 保存恢复函数，避免 handleMessage useCallback 闭包陈旧
+  const restoreCalibratedRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    restoreCalibratedRef.current = async () => {
+      if (!viewing) return;
+      try {
+        const comments = await queryComments(viewing._id);
+        for (const c of comments) {
+          if (c.isCalibrated && !c.parentId && c.position) {
+            send({
+              type: "create-annotation",
+              commentId: c._id,
+              position: c.position,
+              content: c.content,
+              likes: c.likes,
+              dislikes: c.dislikes,
+              replyCount: 0,
+              nickname: c.nickname,
+              createdAt: c.createdAt,
+              images: c.images || [],
+            });
+          }
+        }
+      } catch (err) {
+        console.error("[AppViewer] restore annotations error:", err);
+      }
+    };
+  }, [viewing, send]);
+
   // 设置 postToVerge3D 发送函数到 store
   useEffect(() => {
     if (!viewing) return;
@@ -80,6 +109,7 @@ export default function AppViewer() {
 
       switch (msg.type) {
         case "annotation-bridge-ready":
+          restoreCalibratedRef.current();
           break;
 
         case "position-picked":
