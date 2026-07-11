@@ -558,8 +558,11 @@ export default function CommentPanel({
   const requireAuth = useUserStore((s) => s.requireAuth);
 
   // 检查当前用户是否是评论/回复的作者
-  const isOwner = (comment: CommentItem) =>
-    user?.uid && comment.userId === user.uid;
+  const isOwner = (comment: CommentItem | undefined | null) => {
+    if (comment == null)
+      console.warn("[CommentPanel] isOwner called with null/undefined");
+    return user?.uid && comment?.userId === user?.uid;
+  };
 
   // 回复状态
   const [replyToId, setReplyToId] = useState<string | null>(null);
@@ -623,6 +626,9 @@ export default function CommentPanel({
   const load = useCallback(async () => {
     setLoading(true);
     const data = await queryComments(appId);
+    const hasUndefined = data.some((c) => c == null);
+    if (hasUndefined)
+      console.warn("[CommentPanel] load returned undefined entries:", data);
     setComments(data);
     setLoading(false);
   }, [appId]);
@@ -959,8 +965,19 @@ export default function CommentPanel({
   useEffect(() => {
     if (!annotationAction || !user?.uid) return;
     const { type, commentId, text } = annotationAction;
+    console.log("[CommentPanel] annotationAction received:", {
+      type,
+      commentId,
+      text,
+    });
     const target = comments.find((c) => c._id === commentId);
     if (!target) {
+      console.warn(
+        "[CommentPanel] annotationAction target not found, commentId:",
+        commentId,
+        "comments.length:",
+        comments.length,
+      );
       setAnnotationAction(null);
       return;
     }
@@ -1402,252 +1419,277 @@ export default function CommentPanel({
           </div>
         ) : (
           <div className="space-y-3">
-            {topLevelComments.map((c) => {
-              const replies = repliesByParent[c._id] || [];
-              const sortedReplies = sortReplies(replies);
-              const allExpanded = showAllReplies.has(c._id);
-              const visibleReplies = allExpanded
-                ? sortedReplies
-                : (() => {
-                    const bestReplies = sortedReplies.filter((r) => r.isBest);
-                    if (bestReplies.length > 0) {
-                      // 优中选赞最多，赞相同选最新
-                      const best = bestReplies.sort((a, b) => {
+            {topLevelComments
+              .filter((c) => {
+                if (c == null)
+                  console.warn("[CommentPanel] null/undefined topLevelComment");
+                return c != null;
+              })
+              .map((c) => {
+                const replies = repliesByParent[c._id] || [];
+                const sortedReplies = sortReplies(replies);
+                const allExpanded = showAllReplies.has(c._id);
+                const safeSortedReplies = sortedReplies.filter((r) => {
+                  if (r == null)
+                    console.warn(
+                      "[CommentPanel] null/undefined reply in sortedReplies for comment",
+                      c._id,
+                    );
+                  return r != null;
+                });
+                const visibleReplies = allExpanded
+                  ? safeSortedReplies
+                  : (() => {
+                      if (safeSortedReplies.length === 0) return [];
+                      const bestReplies = safeSortedReplies.filter(
+                        (r) => r.isBest,
+                      );
+                      if (bestReplies.length > 0) {
+                        // 优中选赞最多，赞相同选最新
+                        const best = bestReplies.sort((a, b) => {
+                          if (b.likes !== a.likes) return b.likes - a.likes;
+                          return (
+                            new Date(b.createdAt).getTime() -
+                            new Date(a.createdAt).getTime()
+                          );
+                        })[0];
+                        return [best];
+                      }
+                      // 无优，选赞最多，赞相同选最新
+                      const top = [...safeSortedReplies].sort((a, b) => {
                         if (b.likes !== a.likes) return b.likes - a.likes;
                         return (
                           new Date(b.createdAt).getTime() -
                           new Date(a.createdAt).getTime()
                         );
                       })[0];
-                      return [best];
-                    }
-                    // 无优，选赞最多，赞相同选最新
-                    const top = [...sortedReplies].sort((a, b) => {
-                      if (b.likes !== a.likes) return b.likes - a.likes;
-                      return (
-                        new Date(b.createdAt).getTime() -
-                        new Date(a.createdAt).getTime()
-                      );
-                    })[0];
-                    return [top];
-                  })();
+                      return [top];
+                    })();
 
-              return (
-                <div key={c._id}>
-                  {/* 胶囊卡片 */}
-                  <CommentCapsule
-                    comment={c}
-                    onCalibrate={() => handleCalibrate(c)}
-                    onEdit={() => setEditTarget(c)}
-                    onMove={() => setMoveTarget(c)}
-                    onDeleteCalibration={() => setDeleteTarget(c)}
-                    onDeleteComment={() => setDeleteCommentTarget(c)}
-                    pinged={pingedCommentId === c._id}
-                    onImageClick={setLightboxSrc}
-                    isOwner={isOwner(c)}
-                    onExpand={() => {
-                      if (postToVerge3D && c.isCalibrated) {
-                        postToVerge3D({
-                          type: "ping-annotation",
-                          commentId: c._id,
-                        });
-                      }
-                    }}
-                  />
+                return (
+                  <div key={c._id}>
+                    {/* 胶囊卡片 */}
+                    <CommentCapsule
+                      comment={c}
+                      onCalibrate={() => handleCalibrate(c)}
+                      onEdit={() => setEditTarget(c)}
+                      onMove={() => setMoveTarget(c)}
+                      onDeleteCalibration={() => setDeleteTarget(c)}
+                      onDeleteComment={() => setDeleteCommentTarget(c)}
+                      pinged={pingedCommentId === c._id}
+                      onImageClick={setLightboxSrc}
+                      isOwner={isOwner(c)}
+                      onExpand={() => {
+                        if (postToVerge3D && c.isCalibrated) {
+                          postToVerge3D({
+                            type: "ping-annotation",
+                            commentId: c._id,
+                          });
+                        }
+                      }}
+                    />
 
-                  {/* 👍 💬 放在胶囊外部 */}
-                  <div className="flex items-center gap-4 px-3 py-1.5">
-                    {/* 点赞 */}
-                    <button
-                      onClick={() => handleToggleLike(c)}
-                      className={`flex items-center gap-1 text-xs transition-colors ${
-                        c.likedBy.includes(user?.uid || "")
-                          ? "text-red-500"
-                          : "text-gray-400 hover:text-red-400"
-                      }`}
-                    >
-                      <Heart
-                        size={14}
-                        fill={
+                    {/* 👍 💬 放在胶囊外部 */}
+                    <div className="flex items-center gap-4 px-3 py-1.5">
+                      {/* 点赞 */}
+                      <button
+                        onClick={() => handleToggleLike(c)}
+                        className={`flex items-center gap-1 text-xs transition-colors ${
                           c.likedBy.includes(user?.uid || "")
-                            ? "currentColor"
-                            : "none"
-                        }
-                      />
-                      <span>赞</span>
-                      {c.likes > 0 && <span>{c.likes}</span>}
-                    </button>
-
-                    {/* 踩 */}
-                    <button
-                      onClick={() => handleToggleDislike(c)}
-                      className={`flex items-center gap-1 text-xs transition-colors ${
-                        c.dislikedBy.includes(user?.uid || "")
-                          ? "text-orange-500"
-                          : "text-gray-400 hover:text-orange-400"
-                      }`}
-                    >
-                      <ThumbsDown
-                        size={14}
-                        fill={
-                          c.dislikedBy.includes(user?.uid || "")
-                            ? "currentColor"
-                            : "none"
-                        }
-                      />
-                      <span>踩</span>
-                      {c.dislikes > 0 && <span>{c.dislikes}</span>}
-                    </button>
-
-                    {/* 回复 */}
-                    <button
-                      onClick={() =>
-                        setReplyToId(replyToId === c._id ? null : c._id)
-                      }
-                      className={`flex items-center gap-1 text-xs transition-colors ${
-                        replyToId === c._id
-                          ? "text-blue-500"
-                          : "text-gray-400 hover:text-blue-400"
-                      }`}
-                    >
-                      <MessageCircle size={14} />
-                      <span>回复</span>
-                      {replies.length > 0 && <span>{replies.length}</span>}
-                    </button>
-                  </div>
-
-                  {/* 回复容器（带背景色区分） */}
-                  {(replies.length > 0 || replyToId === c._id) && (
-                    <div className="mb-2 ml-4 overflow-hidden rounded-lg border border-gray-100 bg-gray-50/80">
-                      {/* 回复列表 */}
-                      {visibleReplies.map((r) => (
-                        <div key={r._id}>
-                          <ReplyCapsule
-                            reply={r}
-                            onDelete={() => setReplyDeleteTarget(r)}
-                            onImageClick={setLightboxSrc}
-                            isOwner={isOwner(r)}
-                          />
-                          {/* 回复的点赞在胶囊外部 */}
-                          <div className="flex items-center gap-3 px-3 pb-1.5">
-                            <button
-                              onClick={() => handleToggleLike(r)}
-                              className={`flex items-center gap-1 text-xs transition-colors ${
-                                r.likedBy.includes(user?.uid || "")
-                                  ? "text-red-500"
-                                  : "text-gray-400 hover:text-red-400"
-                              }`}
-                            >
-                              <Heart
-                                size={14}
-                                fill={
-                                  r.likedBy.includes(user?.uid || "")
-                                    ? "currentColor"
-                                    : "none"
-                                }
-                              />
-                              <span>赞</span>
-                              {r.likes > 0 && <span>{r.likes}</span>}
-                            </button>
-                            {/* 踩 */}
-                            <button
-                              onClick={() => handleToggleDislike(r)}
-                              className={`flex items-center gap-1 text-xs transition-colors ${
-                                r.dislikedBy.includes(user?.uid || "")
-                                  ? "text-orange-500"
-                                  : "text-gray-400 hover:text-orange-400"
-                              }`}
-                            >
-                              <ThumbsDown
-                                size={14}
-                                fill={
-                                  r.dislikedBy.includes(user?.uid || "")
-                                    ? "currentColor"
-                                    : "none"
-                                }
-                              />
-                              <span>踩</span>
-                              {r.dislikes > 0 && <span>{r.dislikes}</span>}
-                            </button>
-                            {/* 优（仅管理员可见） */}
-                            {user?.isAdmin && (
-                              <button
-                                onClick={() => handleToggleBest(r)}
-                                className={`flex items-center gap-1 text-xs transition-colors ${
-                                  r.isBest
-                                    ? "text-amber-500"
-                                    : "text-gray-400 hover:text-amber-400"
-                                }`}
-                                title={r.isBest ? "取消优" : "标记为优"}
-                              >
-                                <svg
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 24 24"
-                                  fill={r.isBest ? "currentColor" : "none"}
-                                  stroke="currentColor"
-                                  strokeWidth="2.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <circle cx="12" cy="12" r="10" />
-                                </svg>
-                                <span>优</span>
-                              </button>
-                            )}
-                            {/* 编辑（作者和管理员可见） */}
-                            {(isOwner(r) || user?.isAdmin) && (
-                              <button
-                                onClick={() => setReplyEditTarget(r)}
-                                className="flex items-center gap-1 text-xs text-gray-400 transition-colors hover:text-blue-500"
-                                title="编辑回复"
-                              >
-                                <svg
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-                                </svg>
-                                <span>编辑</span>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* "共 xx 条回复" 展开/收起 */}
-                      {replies.length > 1 && (
-                        <button
-                          onClick={() => toggleShowAllReplies(c._id)}
-                          className="w-full border-t border-gray-100 px-3 py-1.5 text-left text-xs text-blue-500 transition-colors hover:bg-gray-100/50"
-                        >
-                          {allExpanded
-                            ? "收起回复"
-                            : `共 ${replies.length} 条回复`}
-                        </button>
-                      )}
-
-                      {/* 回复输入框 */}
-                      {replyToId === c._id && (
-                        <ReplyInput
-                          onSubmit={(text, images) => {
-                            handleSubmitReply(c._id, text, images);
-                            setReplyToId(null);
-                          }}
-                          onCancel={() => setReplyToId(null)}
+                            ? "text-red-500"
+                            : "text-gray-400 hover:text-red-400"
+                        }`}
+                      >
+                        <Heart
+                          size={14}
+                          fill={
+                            c.likedBy.includes(user?.uid || "")
+                              ? "currentColor"
+                              : "none"
+                          }
                         />
-                      )}
+                        <span>赞</span>
+                        {c.likes > 0 && <span>{c.likes}</span>}
+                      </button>
+
+                      {/* 踩 */}
+                      <button
+                        onClick={() => handleToggleDislike(c)}
+                        className={`flex items-center gap-1 text-xs transition-colors ${
+                          c.dislikedBy.includes(user?.uid || "")
+                            ? "text-orange-500"
+                            : "text-gray-400 hover:text-orange-400"
+                        }`}
+                      >
+                        <ThumbsDown
+                          size={14}
+                          fill={
+                            c.dislikedBy.includes(user?.uid || "")
+                              ? "currentColor"
+                              : "none"
+                          }
+                        />
+                        <span>踩</span>
+                        {c.dislikes > 0 && <span>{c.dislikes}</span>}
+                      </button>
+
+                      {/* 回复 */}
+                      <button
+                        onClick={() =>
+                          setReplyToId(replyToId === c._id ? null : c._id)
+                        }
+                        className={`flex items-center gap-1 text-xs transition-colors ${
+                          replyToId === c._id
+                            ? "text-blue-500"
+                            : "text-gray-400 hover:text-blue-400"
+                        }`}
+                      >
+                        <MessageCircle size={14} />
+                        <span>回复</span>
+                        {replies.length > 0 && <span>{replies.length}</span>}
+                      </button>
                     </div>
-                  )}
-                </div>
-              );
-            })}
+
+                    {/* 回复容器（带背景色区分） */}
+                    {(replies.length > 0 || replyToId === c._id) && (
+                      <div className="mb-2 ml-4 overflow-hidden rounded-lg border border-gray-100 bg-gray-50/80">
+                        {/* 回复列表 */}
+                        {visibleReplies
+                          .filter((r) => {
+                            if (r == null)
+                              console.warn(
+                                "[CommentPanel] null/undefined visibleReply",
+                              );
+                            return r != null;
+                          })
+                          .map((r) => (
+                            <div key={r._id}>
+                              <ReplyCapsule
+                                reply={r}
+                                onDelete={() => setReplyDeleteTarget(r)}
+                                onImageClick={setLightboxSrc}
+                                isOwner={isOwner(r)}
+                              />
+                              {/* 回复的点赞在胶囊外部 */}
+                              <div className="flex items-center gap-3 px-3 pb-1.5">
+                                <button
+                                  onClick={() => handleToggleLike(r)}
+                                  className={`flex items-center gap-1 text-xs transition-colors ${
+                                    r.likedBy.includes(user?.uid || "")
+                                      ? "text-red-500"
+                                      : "text-gray-400 hover:text-red-400"
+                                  }`}
+                                >
+                                  <Heart
+                                    size={14}
+                                    fill={
+                                      r.likedBy.includes(user?.uid || "")
+                                        ? "currentColor"
+                                        : "none"
+                                    }
+                                  />
+                                  <span>赞</span>
+                                  {r.likes > 0 && <span>{r.likes}</span>}
+                                </button>
+                                {/* 踩 */}
+                                <button
+                                  onClick={() => handleToggleDislike(r)}
+                                  className={`flex items-center gap-1 text-xs transition-colors ${
+                                    r.dislikedBy.includes(user?.uid || "")
+                                      ? "text-orange-500"
+                                      : "text-gray-400 hover:text-orange-400"
+                                  }`}
+                                >
+                                  <ThumbsDown
+                                    size={14}
+                                    fill={
+                                      r.dislikedBy.includes(user?.uid || "")
+                                        ? "currentColor"
+                                        : "none"
+                                    }
+                                  />
+                                  <span>踩</span>
+                                  {r.dislikes > 0 && <span>{r.dislikes}</span>}
+                                </button>
+                                {/* 优（仅管理员可见） */}
+                                {user?.isAdmin && (
+                                  <button
+                                    onClick={() => handleToggleBest(r)}
+                                    className={`flex items-center gap-1 text-xs transition-colors ${
+                                      r.isBest
+                                        ? "text-amber-500"
+                                        : "text-gray-400 hover:text-amber-400"
+                                    }`}
+                                    title={r.isBest ? "取消优" : "标记为优"}
+                                  >
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill={r.isBest ? "currentColor" : "none"}
+                                      stroke="currentColor"
+                                      strokeWidth="2.5"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <circle cx="12" cy="12" r="10" />
+                                    </svg>
+                                    <span>优</span>
+                                  </button>
+                                )}
+                                {/* 编辑（作者和管理员可见） */}
+                                {(isOwner(r) || user?.isAdmin) && (
+                                  <button
+                                    onClick={() => setReplyEditTarget(r)}
+                                    className="flex items-center gap-1 text-xs text-gray-400 transition-colors hover:text-blue-500"
+                                    title="编辑回复"
+                                  >
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                                    </svg>
+                                    <span>编辑</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+
+                        {/* "共 xx 条回复" 展开/收起 */}
+                        {replies.length > 1 && (
+                          <button
+                            onClick={() => toggleShowAllReplies(c._id)}
+                            className="w-full border-t border-gray-100 px-3 py-1.5 text-left text-xs text-blue-500 transition-colors hover:bg-gray-100/50"
+                          >
+                            {allExpanded
+                              ? "收起回复"
+                              : `共 ${replies.length} 条回复`}
+                          </button>
+                        )}
+
+                        {/* 回复输入框 */}
+                        {replyToId === c._id && (
+                          <ReplyInput
+                            onSubmit={(text, images) => {
+                              handleSubmitReply(c._id, text, images);
+                              setReplyToId(null);
+                            }}
+                            onCancel={() => setReplyToId(null)}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         )}
       </div>
