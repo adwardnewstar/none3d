@@ -92,8 +92,28 @@ export const useAppStore = create<AppStore>((set) => ({
 export interface UserInfo {
   uid: string;
   username: string;
+  nickname?: string;
   isAdmin?: boolean;
 }
+
+type Theme = "dark" | "light";
+
+function loadTheme(): Theme {
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem("theme");
+    if (saved === "light" || saved === "dark") return saved;
+  }
+  return "dark";
+}
+
+function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+  root.classList.remove("theme-dark", "theme-light");
+  root.classList.add(theme === "dark" ? "theme-dark" : "theme-light");
+  localStorage.setItem("theme", theme);
+}
+
+// 主题初始化移至 App.tsx 中执行
 
 interface UserStore {
   /** 当前登录用户 */
@@ -104,6 +124,8 @@ interface UserStore {
   profileOpen: boolean;
   /** 登录成功后的待执行操作（被拦截的操作） */
   pendingAction: (() => void) | null;
+  /** 当前主题 */
+  theme: Theme;
   /** 设置当前用户 */
   setUser: (user: UserInfo | null) => void;
   /** 设置登录弹窗显隐 */
@@ -116,6 +138,8 @@ interface UserStore {
   requireAuth: (pendingAction?: () => void) => boolean;
   /** 设置管理员状态 */
   setAdmin: (isAdmin: boolean) => void;
+  /** 切换主题 */
+  setTheme: (theme: Theme) => void;
 }
 
 export const useUserStore = create<UserStore>((set, get) => ({
@@ -123,6 +147,7 @@ export const useUserStore = create<UserStore>((set, get) => ({
   showAuthModal: false,
   profileOpen: false,
   pendingAction: null,
+  theme: loadTheme(),
 
   setUser: (user) => set({ user }),
 
@@ -160,5 +185,10 @@ export const useUserStore = create<UserStore>((set, get) => ({
     if (user) {
       set({ user: { ...user, isAdmin } });
     }
+  },
+
+  setTheme: (theme) => {
+    applyTheme(theme);
+    set({ theme });
   },
 }));

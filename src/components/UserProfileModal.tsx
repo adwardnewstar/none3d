@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Loader2, RefreshCw } from "lucide-react";
+import { X, Loader2, ChevronDown, ChevronUp, LogOut } from "lucide-react";
 import { useUserStore } from "@/store";
 import { generateAvatar } from "@/utils/avatar";
+import { compressAvatar } from "@/utils/compressAvatar";
 import { getProfile, upsertProfile } from "@/api/userProfile";
-import { supabase } from "@/supabase";
-import type { UserProfile } from "@/types";
+import { logout } from "@/api/auth";
 
 interface Props {
   onClose: () => void;
@@ -13,16 +13,17 @@ interface Props {
 export default function UserProfileModal({ onClose }: Props) {
   const { user } = useUserStore();
   const uid = user?.uid || "";
+  const email = user?.username || "";
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [avatar, setAvatar] = useState("");
   const [nickname, setNickname] = useState("");
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
 
   // 重置密码
+  const [pwdOpen, setPwdOpen] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -32,6 +33,12 @@ export default function UserProfileModal({ onClose }: Props) {
 
   const [saved, setSaved] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const avatarCompressingRef = useRef(false);
+
+  const defaultNickname = email.includes("@")
+    ? email.split("@")[0].slice(0, 8)
+    : email.slice(0, 8);
 
   useEffect(() => {
     const load = async () => {
@@ -41,33 +48,69 @@ export default function UserProfileModal({ onClose }: Props) {
 
       const profile = await getProfile(uid);
       if (profile) {
-        setNickname(profile.nickname || "");
+        setNickname(profile.nickname || defaultNickname);
         setPhone(profile.phone || "");
-        setEmail(profile.email || "");
         setCompany(profile.company || "");
         if (profile.avatar) {
           setAvatar(profile.avatar);
           localStorage.setItem(`avatar_${uid}`, profile.avatar);
         }
       } else {
-        setNickname(user?.username || "");
+        setNickname(defaultNickname);
       }
       setLoading(false);
     };
     load();
-  }, [uid, user]);
+  }, [uid, defaultNickname]);
 
-  const handleRegenerateAvatar = () => {
-    const newAvatar = generateAvatar(uid + Date.now());
-    setAvatar(newAvatar);
-    localStorage.setItem(`avatar_${uid}`, newAvatar);
+  // 头像上传处理
+  const handleAvatarFile = async (file: File) => {
+    if (avatarCompressingRef.current) return;
+    if (!file.type.startsWith("image/")) return;
+    avatarCompressingRef.current = true;
+    try {
+      const dataUrl = await compressAvatar(file);
+      setAvatar(dataUrl);
+      localStorage.setItem(`avatar_${uid}`, dataUrl);
+    } catch {
+      // ignore
+    }
+    avatarCompressingRef.current = false;
+  };
+
+  const handleAvatarClick = () => {
+    fileRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      handleAvatarFile(files[0]);
+    }
+    e.target.value = "";
+  };
+
+  // 粘贴上传
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf("image") === 0) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        if (file) {
+          handleAvatarFile(file);
+        }
+        return;
+      }
+    }
   };
 
   const handleSave = async () => {
     setSaving(true);
     const success = await upsertProfile({
       uid,
-      nickname: nickname.trim() || user?.username || "",
+      nickname: nickname.trim() || defaultNickname,
       avatar,
       phone,
       email,
@@ -104,6 +147,7 @@ export default function UserProfileModal({ onClose }: Props) {
 
     setResettingPwd(true);
     try {
+      const { supabase } = await import("@/supabase");
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -121,184 +165,220 @@ export default function UserProfileModal({ onClose }: Props) {
     setResettingPwd(false);
   };
 
+  const handleLogout = async () => {
+    await logout();
+    useUserStore.setState({ user: null });
+    onClose();
+  };
+
   if (!uid) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[1001] flex items-center justify-center bg-black/40"
+      className="fixed inset-0 z-[1001] flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      onPaste={handlePaste}
     >
-      <div ref={modalRef} className="w-96 rounded-xl bg-white p-6 shadow-xl">
+      <div
+        ref={modalRef}
+        className="w-96 rounded-[10px] border-2 border-[var(--border-card)] bg-[var(--bg-card)] p-6 shadow-xl"
+      >
         {/* 头部 */}
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-800">个人资料</h3>
+        <div className="mb-5 flex items-center justify-between">
+          <h3 className="text-sm font-medium text-[var(--text-primary)]">
+            个人资料
+          </h3>
           <button
             onClick={onClose}
-            className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            className="rounded p-1 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-btn)] hover:text-[var(--text-primary)]"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 size={20} className="animate-spin text-gray-400" />
+            <Loader2
+              size={20}
+              className="animate-spin text-[var(--text-secondary)]"
+            />
           </div>
         ) : (
-          <div className="space-y-4">
-            {/* 头像区 */}
-            <div className="flex flex-col items-center gap-2">
-              <div className="relative">
+          <div className="space-y-3">
+            {/* 头像 */}
+            <div className="flex flex-col items-center gap-1.5">
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileRef}
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <button
+                onClick={handleAvatarClick}
+                className="h-20 w-20 overflow-hidden rounded-full border-2 border-[var(--border-btn)] transition-colors hover:border-white/40"
+                title="点击上传头像"
+              >
                 <img
                   src={avatar}
                   alt="avatar"
-                  className="h-20 w-20 rounded-full border-2 border-gray-200 object-cover"
+                  className="h-full w-full object-cover"
                 />
-                <button
-                  onClick={handleRegenerateAvatar}
-                  className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200"
-                  title="随机换一个头像"
-                >
-                  <RefreshCw size={14} />
-                </button>
-              </div>
-              <span className="text-xs text-gray-400">点击图标随机换头像</span>
+              </button>
+              <span className="text-xs text-[var(--text-muted)]">
+                点击或粘贴上传头像
+              </span>
             </div>
 
             {/* 昵称 */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500">
-                昵称
-              </label>
+            <div className="flex items-center rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm focus-within:border-white/20">
+              <span className="shrink-0 text-[var(--text-secondary)]">
+                昵称：
+              </span>
               <input
                 type="text"
+                placeholder="昵称"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                maxLength={20}
-                className="w-full rounded-lg border bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400 focus:bg-white"
+                maxLength={8}
+                className="ml-1 flex-1 bg-transparent text-[var(--text-primary)] outline-none placeholder:text-gray-500"
               />
             </div>
 
             {/* 电话 */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500">
-                电话
-              </label>
+            <div className="flex items-center rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm focus-within:border-white/20">
+              <span className="shrink-0 text-[var(--text-secondary)]">
+                电话：
+              </span>
               <input
                 type="text"
+                placeholder="电话"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 maxLength={20}
-                className="w-full rounded-lg border bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400 focus:bg-white"
+                className="ml-1 flex-1 bg-transparent text-[var(--text-primary)] outline-none placeholder:text-gray-500"
               />
             </div>
 
-            {/* 邮箱 */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500">
-                邮箱
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                maxLength={100}
-                className="w-full rounded-lg border bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400 focus:bg-white"
-              />
+            {/* 邮箱（只读） */}
+            <div className="flex items-center rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm">
+              <span className="shrink-0 text-[var(--text-secondary)]">
+                邮箱：
+              </span>
+              <span className="ml-1 text-[var(--text-secondary)]">{email}</span>
             </div>
 
             {/* 公司 */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500">
-                公司
-              </label>
+            <div className="flex items-center rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm focus-within:border-white/20">
+              <span className="shrink-0 text-[var(--text-secondary)]">
+                公司：
+              </span>
               <input
                 type="text"
+                placeholder="公司（选填）"
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
                 maxLength={50}
-                className="w-full rounded-lg border bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400 focus:bg-white"
+                className="ml-1 flex-1 bg-transparent text-[var(--text-primary)] outline-none placeholder:text-gray-500"
               />
             </div>
 
-            {/* 重置密码 */}
-            <div className="space-y-2 border-t pt-4">
-              <label className="block text-xs font-medium text-gray-500">
-                重置密码
-              </label>
-              <input
-                type="password"
-                value={oldPassword}
-                onChange={(e) => {
-                  setOldPassword(e.target.value);
-                  setPwdMsg("");
-                  setPwdSuccess(false);
-                }}
-                placeholder="旧密码"
-                maxLength={100}
-                className="w-full rounded-lg border bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400 focus:bg-white"
-              />
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => {
-                  setNewPassword(e.target.value);
-                  setPwdMsg("");
-                  setPwdSuccess(false);
-                }}
-                placeholder="新密码"
-                maxLength={100}
-                className="w-full rounded-lg border bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400 focus:bg-white"
-              />
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => {
-                  setConfirmPassword(e.target.value);
-                  setPwdMsg("");
-                  setPwdSuccess(false);
-                }}
-                placeholder="确认新密码"
-                maxLength={100}
-                className="w-full rounded-lg border bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400 focus:bg-white"
-              />
-              <button
-                onClick={handleResetPassword}
-                disabled={resettingPwd}
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-gray-200 disabled:opacity-60"
-              >
-                {resettingPwd ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : null}
-                确认修改
-              </button>
-              {pwdMsg && (
-                <p
-                  className={`text-xs ${pwdSuccess ? "text-green-500" : "text-red-500"}`}
+            {/* 重置密码（可折叠） */}
+            {pwdOpen && (
+              <div className="space-y-3">
+                <input
+                  type="password"
+                  value={oldPassword}
+                  onChange={(e) => {
+                    setOldPassword(e.target.value);
+                    setPwdMsg("");
+                    setPwdSuccess(false);
+                  }}
+                  placeholder="旧密码"
+                  maxLength={100}
+                  className="w-full rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-gray-500 focus:border-white/20"
+                />
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    setPwdMsg("");
+                    setPwdSuccess(false);
+                  }}
+                  placeholder="新密码"
+                  maxLength={100}
+                  className="w-full rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-gray-500 focus:border-white/20"
+                />
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    setPwdMsg("");
+                    setPwdSuccess(false);
+                  }}
+                  placeholder="确认新密码"
+                  maxLength={100}
+                  className="w-full rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-gray-500 focus:border-white/20"
+                />
+                <button
+                  onClick={handleResetPassword}
+                  disabled={resettingPwd}
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded bg-[var(--bg-btn)] px-3 py-1.5 text-sm text-[var(--text-btn)] transition-colors hover:bg-[var(--bg-btn-hover)] disabled:opacity-60"
                 >
-                  {pwdSuccess ? "密码修改成功" : pwdMsg}
-                </p>
-              )}
-            </div>
+                  {resettingPwd && (
+                    <Loader2 size={14} className="animate-spin" />
+                  )}
+                  确认修改
+                </button>
+                {pwdMsg && (
+                  <p
+                    className={`text-xs ${pwdSuccess ? "text-green-400" : "text-red-400"}`}
+                  >
+                    {pwdSuccess ? "密码修改成功" : pwdMsg}
+                  </p>
+                )}
+              </div>
+            )}
 
-            {/* 保存 */}
-            <div className="flex justify-end gap-2 border-t pt-4">
-              <button
-                onClick={onClose}
-                className="rounded-lg px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100"
-              >
-                关闭
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-sm text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
-              >
-                {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-                {saved ? "已保存" : "保存"}
-              </button>
+            {/* 退出账户 + 底部按钮 */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPwdOpen((v) => !v)}
+                  className="rounded bg-[var(--bg-btn)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-btn-hover)]"
+                >
+                  重置密码
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="rounded bg-[var(--bg-btn)] px-3 py-1.5 text-sm text-red-400 transition-colors hover:bg-[var(--bg-btn-hover)]"
+                >
+                  退出账户
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onClose}
+                  className="rounded px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-btn)]"
+                >
+                  关闭
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-1.5 rounded bg-[var(--bg-btn-hover)] px-4 py-1.5 text-sm font-medium text-[var(--text-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
+                >
+                  {saving ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : null}
+                  {saved ? "已保存" : "保存"}
+                </button>
+              </div>
             </div>
           </div>
         )}

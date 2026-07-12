@@ -14,8 +14,11 @@ import {
   LogOut,
   User,
   PanelLeftClose,
+  PanelLeftOpen,
+  ChevronDown,
 } from "lucide-react";
 import { compressImage } from "@/utils/imageCompress";
+import ConfirmDialog from "./ConfirmDialog";
 import {
   queryComments,
   addComment,
@@ -69,10 +72,10 @@ function CommentCapsule({
 
   return (
     <div
-      className={`rounded-lg border bg-white transition-all duration-300 ${
+      className={`rounded border bg-[var(--bg-card-header)] transition-all duration-300 ${
         pinged
-          ? "border-blue-500 shadow-lg ring-2 ring-blue-500/40 scale-[1.02]"
-          : "border-gray-200"
+          ? "border-[var(--border-btn)] shadow-lg ring-2 ring-white/20 scale-[1.02]"
+          : "border-white/[0.08]"
       }`}
     >
       {/* 头部 - 点击展开/收起 */}
@@ -83,13 +86,13 @@ function CommentCapsule({
         {/* 标定状态圆点 */}
         <span
           className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-            comment.isCalibrated ? "bg-green-500" : "bg-gray-300"
+            comment.isCalibrated ? "bg-green-500" : "bg-gray-600"
           }`}
         />
-        <span className="text-sm font-medium text-gray-700">
+        <span className="text-sm font-medium text-[var(--text-btn)]">
           {comment.nickname}
         </span>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-[var(--text-muted)]">
           {new Date(comment.createdAt).toLocaleString("zh-CN", {
             month: "2-digit",
             day: "2-digit",
@@ -104,7 +107,7 @@ function CommentCapsule({
               e.stopPropagation();
               onDeleteComment();
             }}
-            className="ml-auto rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-500"
+            className="ml-auto rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-btn)] hover:text-red-400"
             title="删除评论"
           >
             <X size={14} />
@@ -114,7 +117,7 @@ function CommentCapsule({
 
       {/* 评论内容：折叠时一行省略，展开时全文 */}
       <p
-        className={`cursor-pointer px-3 pb-1.5 text-sm text-gray-600 ${
+        className={`cursor-pointer px-3 pb-1.5 text-sm text-[var(--text-secondary)] ${
           expanded ? "" : "truncate"
         }`}
         onClick={handleToggle}
@@ -129,7 +132,7 @@ function CommentCapsule({
               key={i}
               src={img}
               alt="comment-img"
-              className="h-16 w-16 cursor-pointer rounded border object-cover transition-opacity hover:opacity-75"
+              className="h-16 w-16 cursor-pointer rounded border border-[var(--border-light)] object-cover transition-opacity hover:opacity-75"
               onClick={(e) => {
                 e.stopPropagation();
                 if (onImageClick) onImageClick(img);
@@ -141,7 +144,7 @@ function CommentCapsule({
 
       {/* 展开后的操作栏 - 仅作者可见 */}
       {expanded && isOwner && (
-        <div className="flex items-center gap-1 border-t border-gray-100 px-2 py-1.5">
+        <div className="flex items-center gap-1 border-t border-[var(--border-card)] px-2 py-1.5">
           <ActionBtn
             icon={<MapPin size={13} />}
             label="标定"
@@ -190,8 +193,8 @@ function ActionBtn({
       disabled={disabled}
       className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors ${
         disabled
-          ? "cursor-not-allowed text-gray-300"
-          : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+          ? "cursor-not-allowed text-gray-600"
+          : "text-[var(--text-muted)] hover:bg-[var(--bg-btn)] hover:text-[var(--text-btn)]"
       }`}
     >
       {icon}
@@ -260,7 +263,7 @@ function ReplyInput({
   };
 
   return (
-    <div className="border-t border-gray-100 px-3 py-2">
+    <div className="border-t border-[var(--border-card)] px-3 py-2">
       {images.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
           {images.map((img, i) => (
@@ -268,11 +271,11 @@ function ReplyInput({
               <img
                 src={img}
                 alt="preview"
-                className="h-12 w-12 rounded border object-cover"
+                className="h-12 w-12 rounded border border-[var(--border-light)] object-cover"
               />
               <button
                 onClick={() => removeImage(i)}
-                className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gray-700 text-[10px] text-white hover:bg-red-500"
+                className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gray-600 text-[10px] text-[var(--text-primary)] hover:bg-red-500"
               >
                 ×
               </button>
@@ -295,7 +298,7 @@ function ReplyInput({
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={300}
-          className="flex-1 rounded-lg border bg-gray-50 px-2.5 py-1.5 text-sm text-gray-800 outline-none focus:border-blue-400 focus:bg-white"
+          className="flex-1 rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-2.5 py-1.5 text-sm text-[var(--text-input)] outline-none placeholder:text-gray-500 focus:border-white/20"
           autoFocus
           onKeyDown={(e) => {
             if (e.key === "Enter" && (text.trim() || images.length > 0)) {
@@ -311,7 +314,7 @@ function ReplyInput({
         <button
           onClick={() => fileRef.current?.click()}
           disabled={isCompressing || images.length >= 2}
-          className="shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+          className="shrink-0 rounded p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-btn)] hover:text-[var(--text-secondary)] disabled:opacity-50"
           title={images.length >= 2 ? "最多 2 张图片" : "添加图片"}
         >
           {isCompressing ? (
@@ -323,7 +326,7 @@ function ReplyInput({
         <button
           onClick={submit}
           disabled={(!text.trim() && images.length === 0) || isCompressing}
-          className="rounded-lg bg-blue-500 px-2.5 py-1.5 text-xs text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
+          className="rounded bg-[var(--bg-btn-hover)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] transition-colors hover:bg-white/30 disabled:opacity-50"
         >
           发送
         </button>
@@ -345,13 +348,13 @@ function ReplyCapsule({
   isOwner: boolean;
 }) {
   return (
-    <div className="border-t border-gray-100 px-3 py-2 last:border-b-0">
+    <div className="border-t border-[var(--border-card)] px-3 py-2 last:border-b-0">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-gray-600">
+          <span className="text-xs font-medium text-[var(--text-secondary)]">
             {reply.nickname}
           </span>
-          <span className="text-[10px] text-gray-400">
+          <span className="text-[10px] text-[var(--text-muted)]">
             {new Date(reply.createdAt).toLocaleString("zh-CN", {
               month: "2-digit",
               day: "2-digit",
@@ -359,12 +362,12 @@ function ReplyCapsule({
               minute: "2-digit",
             })}
           </span>
-          <span className="text-[10px] text-gray-300">回复</span>
+          <span className="text-[10px] text-gray-600">回复</span>
         </div>
         {isOwner && (
           <button
             onClick={onDelete}
-            className="rounded p-0.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-500"
+            className="rounded p-0.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-btn)] hover:text-red-400"
             title="删除回复"
           >
             <X size={12} />
@@ -378,7 +381,7 @@ function ReplyCapsule({
               key={i}
               src={img}
               alt="reply-img"
-              className="h-16 w-16 cursor-pointer rounded border object-cover transition-opacity hover:opacity-75"
+              className="h-16 w-16 cursor-pointer rounded border border-[var(--border-light)] object-cover transition-opacity hover:opacity-75"
               onClick={(e) => {
                 e.stopPropagation();
                 if (onImageClick) onImageClick(img);
@@ -387,48 +390,7 @@ function ReplyCapsule({
           ))}
         </div>
       )}
-      <p className="mt-0.5 text-xs text-gray-500">{reply.content}</p>
-    </div>
-  );
-}
-
-/** 确认弹窗 */
-function ConfirmDialog({
-  open,
-  title,
-  message,
-  onConfirm,
-  onCancel,
-  confirmLabel,
-}: {
-  open: boolean;
-  title: string;
-  message: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  confirmLabel?: string;
-}) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30">
-      <div className="w-80 rounded-xl bg-white p-5 shadow-lg">
-        <h3 className="text-base font-medium text-gray-800">{title}</h3>
-        <p className="mt-2 text-sm text-gray-500">{message}</p>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            onClick={onCancel}
-            className="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100"
-          >
-            取消
-          </button>
-          <button
-            onClick={onConfirm}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-          >
-            {confirmLabel || "确认"}
-          </button>
-        </div>
-      </div>
+      <p className="mt-0.5 text-xs text-[var(--text-muted)]">{reply.content}</p>
     </div>
   );
 }
@@ -463,15 +425,17 @@ function EditDialog({
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30">
-      <div className="w-80 rounded-xl bg-white p-5 shadow-lg">
-        <h3 className="text-base font-medium text-gray-800">{title}</h3>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+      <div className="w-80 rounded-[10px] border-2 border-[var(--border-card)] bg-[var(--bg-card)] p-5 shadow-lg">
+        <h3 className="text-base font-medium text-[var(--text-primary)]">
+          {title}
+        </h3>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={500}
           rows={3}
-          className="mt-2 w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none focus:border-blue-400 text-gray-800"
+          className="mt-2 w-full resize-none rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-input)] outline-none focus:border-white/20"
         />
         {images.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
@@ -480,11 +444,11 @@ function EditDialog({
                 <img
                   src={img}
                   alt="edit-img"
-                  className="h-12 w-12 rounded border object-cover"
+                  className="h-12 w-12 rounded border border-[var(--border-light)] object-cover"
                 />
                 <button
                   onClick={() => removeImage(i)}
-                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gray-700 text-[10px] text-white hover:bg-red-500"
+                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gray-600 text-[10px] text-[var(--text-primary)] hover:bg-red-500"
                 >
                   ×
                 </button>
@@ -495,14 +459,14 @@ function EditDialog({
         <div className="mt-3 flex justify-end gap-2">
           <button
             onClick={onCancel}
-            className="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100"
+            className="rounded px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-btn)]"
           >
             取消
           </button>
           <button
             onClick={() => onSave(text, images.length > 0 ? images : undefined)}
             disabled={!text.trim()}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded bg-[var(--bg-btn-hover)] px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-white/30 disabled:opacity-50"
           >
             保存
           </button>
@@ -858,7 +822,7 @@ export default function CommentPanel({
 
     await addComment(
       appId,
-      user?.username || "匿名用户",
+      user?.nickname || user?.username || "匿名用户",
       text,
       parentId,
       images,
@@ -881,7 +845,7 @@ export default function CommentPanel({
       postToVerge3D({
         type: "annotation-add-reply",
         commentId: parentId,
-        nickname: user?.username || "匿名用户",
+        nickname: user?.nickname || user?.username || "匿名用户",
         content: text.trim(),
         replyCount: newReplyCount,
         images: images,
@@ -1111,7 +1075,7 @@ export default function CommentPanel({
 
     const newId = await addComment(
       appId,
-      user?.username || "匿名用户",
+      user?.nickname || user?.username || "匿名用户",
       content,
       undefined,
       images,
@@ -1333,23 +1297,30 @@ export default function CommentPanel({
   };
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full flex-col bg-[var(--bg-card)]">
       {/* 头部 */}
-      <div className="flex items-center border-b px-4 py-3">
+      <div className="flex items-center border-b border-[var(--border-light)] px-4 py-3">
         {/* 折叠按钮 */}
         <button
           onClick={onToggleSidebar}
-          className="mr-2 rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          className="mr-2 rounded p-1 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-btn)] hover:text-[var(--text-btn)]"
           title="收起侧栏"
         >
-          <PanelLeftClose size={16} />
+          <PanelLeftOpen size={16} className="hidden md:inline" />
+          <ChevronDown size={16} className="md:hidden" />
         </button>
 
         {/* 中间：icon + 评论 + 条数 */}
         <div className="flex flex-1 items-center justify-center gap-2">
-          <MessageCircle size={18} className="text-gray-600" />
-          <span className="font-medium text-gray-800">评论</span>
-          <span className="text-xs text-gray-400">{comments.length} 条</span>
+          <MessageCircle size={18} className="text-[var(--text-secondary)]" />
+          <div className="flex items-center gap-1">
+            <span className="text-sm font-medium text-[var(--text-primary)]">
+              评论
+            </span>
+            <span className="text-sm text-[var(--text-muted)]">
+              {comments.length} 条
+            </span>
+          </div>
         </div>
 
         {/* 右侧：用户操作 */}
@@ -1358,7 +1329,7 @@ export default function CommentPanel({
             <div className="relative flex items-center" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen((v) => !v)}
-                className="h-7 w-7 overflow-hidden rounded-full border border-gray-300 transition-colors hover:border-gray-400"
+                className="h-7 w-7 overflow-hidden rounded-full border border-[var(--border-btn)] transition-colors hover:border-[var(--border-btn-hover)]"
                 title="用户菜单"
               >
                 <img
@@ -1371,13 +1342,13 @@ export default function CommentPanel({
                 />
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-36 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl z-50">
+                <div className="absolute right-0 top-full mt-2 w-36 overflow-hidden rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] shadow-xl z-50">
                   <button
                     onClick={() => {
                       useUserStore.getState().setProfileOpen(true);
                       setMenuOpen(false);
                     }}
-                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-[var(--text-btn)] transition-colors hover:bg-[var(--bg-btn)]"
                   >
                     <User size={14} />
                     个人资料
@@ -1388,7 +1359,7 @@ export default function CommentPanel({
                       useUserStore.setState({ user: null });
                       setMenuOpen(false);
                     }}
-                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 hover:text-red-500"
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-[var(--text-btn)] transition-colors hover:bg-[var(--bg-btn)] hover:text-red-400"
                   >
                     <LogOut size={14} />
                     退出登录
@@ -1399,7 +1370,7 @@ export default function CommentPanel({
           ) : (
             <button
               onClick={() => useUserStore.getState().setShowAuthModal(true)}
-              className="text-xs text-blue-400 transition-colors hover:text-blue-500 hover:underline"
+              className="text-xs text-[var(--text-secondary)] transition-colors hover:text-[var(--text-btn)] hover:underline"
             >
               未登录
             </button>
@@ -1411,10 +1382,13 @@ export default function CommentPanel({
       <div className="flex-1 overflow-y-auto px-3 py-3">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 size={20} className="animate-spin text-gray-400" />
+            <Loader2
+              size={20}
+              className="animate-spin text-[var(--text-secondary)]"
+            />
           </div>
         ) : comments.length === 0 ? (
-          <div className="py-12 text-center text-sm text-gray-400">
+          <div className="py-12 text-center text-sm text-[var(--text-secondary)]">
             暂无评论
           </div>
         ) : (
@@ -1497,7 +1471,7 @@ export default function CommentPanel({
                         className={`flex items-center gap-1 text-xs transition-colors ${
                           c.likedBy.includes(user?.uid || "")
                             ? "text-red-500"
-                            : "text-gray-400 hover:text-red-400"
+                            : "text-[var(--text-secondary)] hover:text-red-400"
                         }`}
                       >
                         <Heart
@@ -1518,7 +1492,7 @@ export default function CommentPanel({
                         className={`flex items-center gap-1 text-xs transition-colors ${
                           c.dislikedBy.includes(user?.uid || "")
                             ? "text-orange-500"
-                            : "text-gray-400 hover:text-orange-400"
+                            : "text-[var(--text-secondary)] hover:text-orange-400"
                         }`}
                       >
                         <ThumbsDown
@@ -1540,8 +1514,8 @@ export default function CommentPanel({
                         }
                         className={`flex items-center gap-1 text-xs transition-colors ${
                           replyToId === c._id
-                            ? "text-blue-500"
-                            : "text-gray-400 hover:text-blue-400"
+                            ? "text-[var(--text-btn)]"
+                            : "text-[var(--text-muted)] hover:text-[var(--text-btn)]"
                         }`}
                       >
                         <MessageCircle size={14} />
@@ -1552,7 +1526,7 @@ export default function CommentPanel({
 
                     {/* 回复容器（带背景色区分） */}
                     {(replies.length > 0 || replyToId === c._id) && (
-                      <div className="mb-2 ml-4 overflow-hidden rounded-lg border border-gray-100 bg-gray-50/80">
+                      <div className="mb-2 ml-4 overflow-hidden rounded-lg border border-[var(--border-card)] bg-[var(--bg-btn-light)]">
                         {/* 回复列表 */}
                         {visibleReplies
                           .filter((r) => {
@@ -1577,7 +1551,7 @@ export default function CommentPanel({
                                   className={`flex items-center gap-1 text-xs transition-colors ${
                                     r.likedBy.includes(user?.uid || "")
                                       ? "text-red-500"
-                                      : "text-gray-400 hover:text-red-400"
+                                      : "text-[var(--text-secondary)] hover:text-red-400"
                                   }`}
                                 >
                                   <Heart
@@ -1597,7 +1571,7 @@ export default function CommentPanel({
                                   className={`flex items-center gap-1 text-xs transition-colors ${
                                     r.dislikedBy.includes(user?.uid || "")
                                       ? "text-orange-500"
-                                      : "text-gray-400 hover:text-orange-400"
+                                      : "text-[var(--text-secondary)] hover:text-orange-400"
                                   }`}
                                 >
                                   <ThumbsDown
@@ -1618,7 +1592,7 @@ export default function CommentPanel({
                                     className={`flex items-center gap-1 text-xs transition-colors ${
                                       r.isBest
                                         ? "text-amber-500"
-                                        : "text-gray-400 hover:text-amber-400"
+                                        : "text-[var(--text-secondary)] hover:text-amber-400"
                                     }`}
                                     title={r.isBest ? "取消优" : "标记为优"}
                                   >
@@ -1641,7 +1615,7 @@ export default function CommentPanel({
                                 {(isOwner(r) || user?.isAdmin) && (
                                   <button
                                     onClick={() => setReplyEditTarget(r)}
-                                    className="flex items-center gap-1 text-xs text-gray-400 transition-colors hover:text-blue-500"
+                                    className="flex items-center gap-1 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-btn)]"
                                     title="编辑回复"
                                   >
                                     <svg
@@ -1667,7 +1641,7 @@ export default function CommentPanel({
                         {replies.length > 1 && (
                           <button
                             onClick={() => toggleShowAllReplies(c._id)}
-                            className="w-full border-t border-gray-100 px-3 py-1.5 text-left text-xs text-blue-500 transition-colors hover:bg-gray-100/50"
+                            className="w-full border-t border-[var(--border-card)] px-3 py-1.5 text-left text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-btn)]"
                           >
                             {allExpanded
                               ? "收起回复"
@@ -1695,7 +1669,7 @@ export default function CommentPanel({
       </div>
 
       {/* 输入区 */}
-      <div className="border-t px-4 py-3">
+      <div className="border-t border-[var(--border-light)] px-4 py-3">
         {images.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
             {images.map((img, i) => (
@@ -1703,11 +1677,11 @@ export default function CommentPanel({
                 <img
                   src={img}
                   alt="preview"
-                  className="h-12 w-12 rounded border object-cover"
+                  className="h-12 w-12 rounded border border-[var(--border-light)] object-cover"
                 />
                 <button
                   onClick={() => removeMainImage(i)}
-                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gray-700 text-[10px] text-white hover:bg-red-500"
+                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gray-600 text-[10px] text-[var(--text-primary)] hover:bg-red-500"
                 >
                   ×
                 </button>
@@ -1734,13 +1708,13 @@ export default function CommentPanel({
             }}
             maxLength={500}
             rows={1}
-            className="min-h-[36px] max-h-[120px] flex-1 resize-none rounded-lg border bg-gray-50 px-3 py-1.5 text-sm text-gray-800 outline-none focus:border-blue-400 focus:bg-white"
+            className="min-h-[36px] max-h-[120px] flex-1 resize-none rounded-lg border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-1.5 text-sm text-[var(--text-input)] outline-none placeholder:text-gray-500 focus:border-white/20"
             onPaste={handleMainPaste}
           />
           <button
             onClick={() => fileRef.current?.click()}
             disabled={images.length >= 2}
-            className="flex items-center justify-center rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+            className="flex items-center justify-center rounded p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-btn)] hover:text-[var(--text-secondary)] disabled:opacity-50"
             title={images.length >= 2 ? "最多 2 张图片" : "添加图片"}
           >
             <Paperclip size={14} />
@@ -1748,7 +1722,7 @@ export default function CommentPanel({
           <button
             onClick={handleSubmit}
             disabled={!content.trim() || submitting}
-            className="flex min-h-[36px] items-center gap-1 self-end rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+            className="flex min-h-[36px] items-center gap-1 self-end rounded bg-[var(--bg-btn-hover)] px-3 py-1.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-white/30 disabled:opacity-50"
           >
             {submitting ? (
               <Loader2 size={14} className="animate-spin" />
@@ -1816,7 +1790,7 @@ export default function CommentPanel({
       {/* 图片放大弹窗 */}
       {lightboxSrc && (
         <div
-          className="fixed inset-0 z-[100000] flex cursor-pointer items-center justify-center bg-black/85"
+          className="fixed inset-0 z-[100000] flex cursor-pointer items-center justify-center bg-black/85 backdrop-blur-sm"
           onClick={() => setLightboxSrc(null)}
         >
           <img

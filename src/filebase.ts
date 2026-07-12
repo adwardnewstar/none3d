@@ -5,10 +5,20 @@
  */
 import { supabase } from "@/supabase";
 
+const UPLOAD_PROXY_URL =
+  "https://zwnluqynchoidpiittdp.supabase.co/functions/v1/upload-proxy";
+
 // ===== Supabase 数据库操作（保留） =====
 
-/** 删除 App 数据库记录及其关联评论 */
+/** 删除 App 数据库记录及其关联评论，以及 Storage 中的封面 */
 export async function deleteAppRecord(appId: string): Promise<void> {
+  // 删除 Storage 封面（并行，不阻塞）
+  fetch(UPLOAD_PROXY_URL, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key: `covers/${appId}.jpg` }),
+  }).catch(() => {});
+
   const { error: commentErr } = await supabase
     .from("n3d_comments")
     .delete()

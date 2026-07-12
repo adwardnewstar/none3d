@@ -70,11 +70,15 @@ export default function AuthModal() {
   if (!showAuthModal) return null;
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40">
-      <div className="w-80 rounded-xl bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="w-80 rounded-[10px] border-2 border-[var(--border-card)] bg-[var(--bg-card)] p-6 shadow-xl">
         <div className="mb-4 text-center">
-          <h3 className="text-lg font-semibold text-gray-800">登录</h3>
-          <p className="mt-1 text-xs text-gray-400">请登录后进行评论操作</p>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+            登录
+          </h3>
+          <p className="mt-1 text-xs text-[var(--text-secondary)]">
+            请登录后进行评论操作
+          </p>
         </div>
 
         <div className="space-y-3">
@@ -89,7 +93,7 @@ export default function AuthModal() {
             }}
             onKeyDown={(e) => e.key === "Enter" && !loading && handleLogin()}
             maxLength={50}
-            className="w-full rounded-lg border bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400 focus:bg-white"
+            className="w-full rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-input)] outline-none placeholder:text-gray-500 focus:border-white/20"
             disabled={loading}
             autoComplete="username"
           />
@@ -103,7 +107,7 @@ export default function AuthModal() {
             }}
             onKeyDown={(e) => e.key === "Enter" && !loading && handleLogin()}
             maxLength={100}
-            className="w-full rounded-lg border bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400 focus:bg-white"
+            className="w-full rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-input)] outline-none placeholder:text-gray-500 focus:border-white/20"
             disabled={loading}
             autoComplete="current-password"
           />
@@ -116,7 +120,7 @@ export default function AuthModal() {
         <div className="mt-4 flex items-center justify-between">
           <button
             onClick={() => setShowAuthModal(false)}
-            className="rounded-lg px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100"
+            className="rounded px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors bg-[var(--bg-btn)] hover:bg-[var(--bg-btn-hover)]"
             disabled={loading}
           >
             取消
@@ -124,7 +128,7 @@ export default function AuthModal() {
           <button
             onClick={handleLogin}
             disabled={loading}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-sm text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+            className="flex items-center gap-1.5 rounded bg-[var(--bg-btn-hover)] px-4 py-1.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-btn-hover)] disabled:opacity-60"
           >
             {loading ? (
               <Loader2 size={14} className="animate-spin" />

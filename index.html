@@ -16,6 +16,13 @@
         })
       }
     </script>
+    <script>
+      (function() {
+        var theme = localStorage.getItem('theme');
+        if (theme !== 'light' && theme !== 'dark') theme = 'dark';
+        document.documentElement.classList.add('theme-' + theme);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

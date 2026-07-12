@@ -10,11 +10,13 @@ import {
   Paperclip,
   PanelLeftOpen,
   PanelLeftClose,
+  ChevronUp,
   Move,
 } from "lucide-react";
 import { useAppStore, useUserStore } from "@/store";
 import { addComment, deleteComment, queryComments } from "@/api/comment";
 import { compressImage } from "@/utils/imageCompress";
+import ConfirmDialog from "./ConfirmDialog";
 import CommentPanel from "./CommentPanel";
 import { CommentItem } from "@/types";
 
@@ -353,7 +355,7 @@ export default function AppViewer() {
     if (!requireAuth()) return;
     setCalibrateSubmitting(true);
 
-    const nickname = user?.username || "匿名用户";
+    const nickname = user?.nickname || user?.username || "匿名用户";
     const content = calibrateContent.trim();
     const images = calibrateImages.length > 0 ? calibrateImages : undefined;
     const isCalibrated = true;
@@ -431,20 +433,20 @@ export default function AppViewer() {
   if (!viewing) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[var(--bg-page)]">
       {/* 顶部栏：关闭(左) + 标题(中) + 评论按钮(右) — 绝对定位浮在 iframe 上 */}
       <div className="absolute left-0 right-0 top-0 z-50 flex h-12 items-center justify-between px-4">
         {/* 左侧：关闭 */}
         <button
           onClick={closeView}
-          className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white transition-colors hover:bg-white/20"
+          className="flex items-center gap-1.5 rounded-full bg-[var(--bg-btn)] px-3 py-1.5 text-xs text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-btn-hover)]"
         >
           <X size={14} />
           关闭
         </button>
 
         {/* 中间：标题 */}
-        <span className="absolute left-1/2 -translate-x-1/2 text-sm text-white/80">
+        <span className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-[var(--text-primary)]">
           {viewing.title}
         </span>
 
@@ -452,10 +454,11 @@ export default function AppViewer() {
         {!sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(true)}
-            className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white transition-colors hover:bg-white/20"
+            className="flex items-center gap-1.5 rounded-full bg-[var(--bg-btn)] px-3 py-1.5 text-xs text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-btn-hover)]"
             title="展开评论"
           >
-            <PanelLeftOpen size={14} />
+            <PanelLeftClose size={14} className="hidden md:inline" />
+            <ChevronUp size={14} className="md:hidden" />
             评论
           </button>
         )}
@@ -465,8 +468,8 @@ export default function AppViewer() {
       {/* 主体：iframe + 底部按钮 */}
       <div className="relative flex-1">
         {iframeLoading && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#00d4ff] border-t-transparent" />
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--bg-page)]">
+            <div className="h-[120px] w-[120px] animate-spin rounded-full border-[4px] border-[var(--spinner-bg)] border-t-[var(--spinner-fg)]" />
           </div>
         )}
         <iframe
@@ -496,10 +499,10 @@ export default function AppViewer() {
                   <button
                     key={ax}
                     onClick={() => handleSelectAxis(ax)}
-                    className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs backdrop-blur transition-colors ${
+                    className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs shadow-sm backdrop-blur transition-colors ${
                       activeAxis === ax
-                        ? "bg-orange-500/90 text-white"
-                        : "bg-red-600/30 text-red-200 hover:bg-red-600/50"
+                        ? "border-orange-700/80 bg-orange-500/90 text-white"
+                        : "border-red-800/40 bg-red-600/30 text-red-200 hover:bg-red-600/50"
                     }`}
                     title={`选中${ax.toUpperCase()}轴`}
                   >
@@ -510,10 +513,10 @@ export default function AppViewer() {
             )}
             <button
               onClick={toggleAxisMode}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs backdrop-blur transition-colors ${
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-sm backdrop-blur transition-colors ${
                 axisModeActive
-                  ? "bg-orange-600/80 text-white hover:bg-orange-700"
-                  : "bg-red-600/30 text-red-200 hover:bg-red-600/50"
+                  ? "border-orange-800/80 bg-orange-600/80 text-white hover:bg-orange-700"
+                  : "border-red-800/40 bg-red-600/30 text-white hover:bg-red-600/50"
               }`}
               title={axisModeActive ? "退出坐标操作" : "进入坐标操作"}
             >
@@ -525,12 +528,12 @@ export default function AppViewer() {
           <button
             onClick={toggleAnnotations}
             disabled={axisModeActive}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs backdrop-blur transition-colors ${
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-sm backdrop-blur transition-colors ${
               axisModeActive
-                ? "bg-black/20 text-gray-600 cursor-not-allowed"
+                ? "border-black/40 bg-black/20 text-gray-600 cursor-not-allowed"
                 : annotationsVisible
-                  ? "bg-blue-600/80 text-white hover:bg-blue-700"
-                  : "bg-black/40 text-gray-400 hover:bg-black/60"
+                  ? "border-blue-800/80 bg-blue-600/80 text-white hover:bg-blue-700"
+                  : "border-black/60 bg-black/40 text-gray-400 hover:bg-black/60"
             }`}
             title={annotationsVisible ? "隐藏标注" : "显示标注"}
           >
@@ -543,12 +546,12 @@ export default function AppViewer() {
           <button
             onClick={axisModeActive ? undefined : toggleCoordinates}
             disabled={axisModeActive}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs backdrop-blur transition-colors ${
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-sm backdrop-blur transition-colors ${
               axisModeActive
-                ? "bg-black/20 text-gray-600 cursor-not-allowed"
+                ? "border-black/40 bg-black/20 text-gray-600 cursor-not-allowed"
                 : coordinatesVisible
-                  ? "bg-blue-600/80 text-white hover:bg-blue-700"
-                  : "bg-black/40 text-gray-400 hover:bg-black/60"
+                  ? "border-blue-800/80 bg-blue-600/80 text-white hover:bg-blue-700"
+                  : "border-black/60 bg-black/40 text-gray-400 hover:bg-black/60"
             }`}
             title={coordinatesVisible ? "隐藏标记组" : "显示标记组"}
           >
@@ -561,10 +564,10 @@ export default function AppViewer() {
           <button
             onClick={startViewCalibrate}
             disabled={axisModeActive || awaitingMarkerPos}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs backdrop-blur transition-colors ${
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-sm backdrop-blur transition-colors ${
               axisModeActive
-                ? "bg-black/20 text-gray-600 cursor-not-allowed"
-                : "bg-green-600/80 text-white hover:bg-green-700 disabled:opacity-60"
+                ? "border-black/40 bg-black/20 text-gray-600 cursor-not-allowed"
+                : "border-green-800/80 bg-green-600/80 text-white hover:bg-green-700 disabled:opacity-60"
             }`}
             title="获取标记组位置生成标定"
           >
@@ -575,19 +578,11 @@ export default function AppViewer() {
       </div>
 
       {/* 侧边栏：桌面从右侧滑入，手机从底部滑出 */}
-      {/* 折叠态遮罩（仅手机端） */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/20 transition-opacity duration-300 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
       <div
-        className={`fixed z-50 border-l border-gray-200 bg-white transition-all duration-300 ease-out
+        className={`fixed z-50 border-l-2 border-[var(--border-card)] bg-[var(--bg-card)] transition-all duration-300 ease-out
           md:bottom-0 md:right-0 md:top-0 md:w-[380px]
           ${sidebarOpen ? "md:translate-x-0 md:opacity-100" : "md:translate-x-full md:opacity-0"}
-          max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:h-[50vh] max-md:rounded-t-xl
+          max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:h-[50vh] max-md:border-t-2 max-md:border-[var(--border-card)]
           ${sidebarOpen ? "max-md:translate-y-0" : "max-md:translate-y-full"}`}
       >
         <CommentPanel
@@ -603,22 +598,24 @@ export default function AppViewer() {
 
       {/* 确认标定弹窗 */}
       {calibratePos && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30">
-          <div className="w-80 rounded-xl bg-white p-5 shadow-lg">
-            <h3 className="text-base font-medium text-gray-800">
-              在标定位置生成标定
-            </h3>
-            <p className="mt-1 text-xs text-gray-400">
-              位置: ({calibratePos.x.toFixed(2)}, {calibratePos.y.toFixed(2)},{" "}
-              {calibratePos.z.toFixed(2)})
-            </p>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="w-80 rounded-[10px] border-2 border-[var(--border-card)] bg-[var(--bg-card)] p-5 shadow-lg">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-medium text-[var(--text-primary)]">
+                标定内容
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)]">
+                位置: ({calibratePos.x.toFixed(2)}, {calibratePos.y.toFixed(2)},{" "}
+                {calibratePos.z.toFixed(2)})
+              </p>
+            </div>
             <textarea
               placeholder="请输入内容"
               value={calibrateContent}
               onChange={(e) => setCalibrateContent(e.target.value)}
               maxLength={500}
               rows={3}
-              className="mt-2 w-full resize-none rounded-lg border bg-gray-50 px-3 py-1.5 text-sm text-gray-800 outline-none focus:border-blue-400 focus:bg-white"
+              className="mt-2 w-full resize-none rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-btn-hover)]"
               onPaste={handleCalibratePaste}
             />
             {calibrateImages.length > 0 && (
@@ -632,7 +629,7 @@ export default function AppViewer() {
                     />
                     <button
                       onClick={() => removeCalibrateImage(i)}
-                      className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gray-700 text-[10px] text-white hover:bg-red-500"
+                      className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gray-700 text-[10px] text-[var(--text-primary)] hover:bg-red-500"
                     >
                       ×
                     </button>
@@ -655,14 +652,14 @@ export default function AppViewer() {
                   setCalibrateContent("");
                   setCalibrateImages([]);
                 }}
-                className="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100"
+                className="mr-auto rounded bg-[var(--bg-btn)] px-3 py-1.5 text-sm text-[var(--text-btn)] transition-colors hover:bg-[var(--bg-btn-hover)]"
               >
                 取消
               </button>
               <button
                 onClick={() => calibrateFileRef.current?.click()}
                 disabled={calibrateImages.length >= 2}
-                className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+                className="flex items-center gap-1 rounded px-2 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-btn)] hover:text-[var(--text-btn)] disabled:opacity-50"
                 title={
                   calibrateImages.length >= 2 ? "最多 2 张图片" : "添加图片"
                 }
@@ -672,7 +669,7 @@ export default function AppViewer() {
               <button
                 onClick={handleCalibrateConfirm}
                 disabled={!calibrateContent.trim() || calibrateSubmitting}
-                className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+                className="flex items-center gap-1 rounded bg-[var(--bg-btn-hover)] px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-white/30 disabled:opacity-50"
               >
                 {calibrateSubmitting ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -686,31 +683,15 @@ export default function AppViewer() {
         </div>
       )}
 
-      {/* 删除评论确认弹窗（悬浮全屏，与侧边栏无关） */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30">
-          <div className="w-80 rounded-xl bg-white p-5 shadow-lg">
-            <h3 className="text-base font-medium text-gray-800">删除评论</h3>
-            <p className="mt-2 text-sm text-gray-500">
-              确认要删除此评论吗？评论和场景中的 annotation 将被一起移除。
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={handleCancelDelete}
-                className="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleConfirmDelete}
-                className="rounded-lg bg-red-500 px-3 py-1.5 text-sm text-white hover:bg-red-600"
-              >
-                删除
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 删除评论确认弹窗 */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="删除评论"
+        message="确认要删除此评论吗？评论和场景中的 annotation 将被一起移除。"
+        confirmLabel="删除"
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
     </div>
   );
 }

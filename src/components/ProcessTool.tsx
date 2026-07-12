@@ -1,6 +1,13 @@
 import { useState } from "react";
 import JSZip from "jszip";
-import { X, FolderOpen, Download, Loader2, Check, AlertCircle } from "lucide-react";
+import {
+  X,
+  FolderOpen,
+  Download,
+  Loader2,
+  Check,
+  AlertCircle,
+} from "lucide-react";
 import {
   processHtml,
   processCss,
@@ -33,14 +40,18 @@ function isImage(name: string): boolean {
 async function walkDir(
   dirHandle: FileSystemDirectoryHandle,
   prefix: string,
-  result: FileEntry[]
+  result: FileEntry[],
 ): Promise<void> {
   for await (const entry of (dirHandle as any).values()) {
     if (entry.kind === "directory") {
       // 跳过整个目录（media/、v3d_app_data/）
       // 注意：不传 excludeImages，避免跳过 png/jpg 目录
       if (shouldSkip(entry.name, true)) continue;
-      await walkDir(entry as FileSystemDirectoryHandle, `${prefix}${entry.name}/`, result);
+      await walkDir(
+        entry as FileSystemDirectoryHandle,
+        `${prefix}${entry.name}/`,
+        result,
+      );
     } else {
       const file = await (entry as FileSystemFileHandle).getFile();
       const zipPath = `${prefix}${entry.name}`;
@@ -96,7 +107,11 @@ export default function ProcessTool({ open, onClose }: Props) {
       setStatus("selected");
       setMessage(`选中 ${list.length} 个文件`);
     } catch (e: any) {
-      if (e.name === "AbortError" || e.message?.includes("abort") || e.message?.includes("dismissed")) {
+      if (
+        e.name === "AbortError" ||
+        e.message?.includes("abort") ||
+        e.message?.includes("dismissed")
+      ) {
         setStatus("idle");
         return;
       }
@@ -146,7 +161,10 @@ export default function ProcessTool({ open, onClose }: Props) {
           zip.file(entry.zipPath, processJs(js));
         } else {
           // 其他文件（含子目录内所有文件）原样复制
-          zip.file(entry.zipPath, new Uint8Array(await entry.file.arrayBuffer()));
+          zip.file(
+            entry.zipPath,
+            new Uint8Array(await entry.file.arrayBuffer()),
+          );
         }
         processed++;
       }
@@ -185,19 +203,24 @@ export default function ProcessTool({ open, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget && status !== "processing") onClose();
       }}
     >
-      <div className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl bg-[#151b3d] p-6 shadow-xl">
+      <div className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-[10px] border-2 border-[var(--border-card)] bg-[var(--bg-card)] p-6 shadow-xl">
         {/* 头部 */}
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-medium text-white">Verge3D 项目处理工具</h3>
+          <h3 className="text-sm font-medium text-[var(--text-primary)]">
+            Verge3D 项目处理工具
+          </h3>
           <button
-            onClick={() => { reset(); onClose(); }}
+            onClick={() => {
+              reset();
+              onClose();
+            }}
             disabled={status === "processing"}
-            className="rounded p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30"
+            className="rounded p-1 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-btn)] hover:text-white disabled:opacity-30"
           >
             <X size={16} />
           </button>
@@ -208,12 +231,12 @@ export default function ProcessTool({ open, onClose }: Props) {
           <div className="flex flex-col items-center gap-4 py-8">
             <button
               onClick={handleSelectFolder}
-              className="flex items-center gap-2 rounded-xl border-2 border-dashed border-[#00d4ff]/30 bg-white/5 px-8 py-6 text-sm text-gray-300 transition-all hover:border-[#00d4ff]/60 hover:bg-white/10"
+              className="flex items-center gap-2 rounded-xl border-2 border-dashed border-[var(--border-btn)] bg-[var(--bg-input)] px-8 py-6 text-sm text-[var(--text-btn)] transition-all hover:border-[var(--border-btn-hover)] hover:bg-[var(--bg-btn)]"
             >
               <FolderOpen size={20} />
               选择 Verge3D 项目文件夹
             </button>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-[var(--text-muted)]">
               选择项目根目录（包含 .html、.js、.css 等文件）
             </p>
           </div>
@@ -224,17 +247,19 @@ export default function ProcessTool({ open, onClose }: Props) {
           <>
             {/* 其他文件（非图片） */}
             <div className="mb-3">
-              <div className="mb-1 text-xs text-gray-500">
+              <div className="mb-1 text-xs text-[var(--text-muted)]">
                 {nonImageFiles.length} 个其他文件（HTML/CSS/JS/KTX2 等）
               </div>
-              <div className="max-h-24 overflow-y-auto rounded-lg bg-black/20 p-2 text-xs text-gray-400">
+              <div className="max-h-24 overflow-y-auto rounded-lg bg-black/20 p-2 text-xs text-[var(--text-secondary)]">
                 {nonImageFiles.slice(0, 30).map((e) => (
                   <div key={e.zipPath} className="truncate px-1 py-0.5">
                     📄 {e.zipPath}
                   </div>
                 ))}
                 {nonImageFiles.length > 30 && (
-                  <div className="px-1 py-0.5 text-gray-600">...还有 {nonImageFiles.length - 30} 个</div>
+                  <div className="px-1 py-0.5 text-gray-600">
+                    ...还有 {nonImageFiles.length - 30} 个
+                  </div>
                 )}
               </div>
             </div>
@@ -242,7 +267,7 @@ export default function ProcessTool({ open, onClose }: Props) {
             {/* png/jpg 图片文件：逐个复选 */}
             {imageFiles.length > 0 && (
               <div className="mb-3">
-                <div className="mb-1 flex items-center justify-between text-xs text-gray-500">
+                <div className="mb-1 flex items-center justify-between text-xs text-[var(--text-muted)]">
                   <span>图片文件（{imageFiles.length} 个）</span>
                   <button
                     onClick={() => {
@@ -251,12 +276,16 @@ export default function ProcessTool({ open, onClose }: Props) {
                         setExcludedSet(new Set());
                       } else {
                         // 全部排除
-                        setExcludedSet(new Set(imageFiles.map((e) => e.zipPath)));
+                        setExcludedSet(
+                          new Set(imageFiles.map((e) => e.zipPath)),
+                        );
                       }
                     }}
-                    className="text-[#00d4ff] hover:underline"
+                    className="text-[var(--text-secondary)] hover:underline"
                   >
-                    {excludedSet.size === imageFiles.length ? "全部保留" : "全部排除"}
+                    {excludedSet.size === imageFiles.length
+                      ? "全部保留"
+                      : "全部排除"}
                   </button>
                 </div>
                 <div className="max-h-36 overflow-y-auto rounded-lg bg-black/20 p-2">
@@ -271,12 +300,16 @@ export default function ProcessTool({ open, onClose }: Props) {
                           type="checkbox"
                           checked={excluded}
                           onChange={() => toggleExclude(e.zipPath)}
-                          className="accent-[#00d4ff]"
+                          className="accent-white/30"
                         />
-                        <span className={`truncate flex-1 ${excluded ? "text-gray-600 line-through" : "text-gray-300"}`}>
+                        <span
+                          className={`truncate flex-1 ${excluded ? "text-gray-600 line-through" : "text-[var(--text-btn)]"}`}
+                        >
                           {e.zipPath}
                         </span>
-                        <span className="text-gray-600">{excluded ? "排除" : "保留"}</span>
+                        <span className="text-gray-600">
+                          {excluded ? "排除" : "保留"}
+                        </span>
                       </label>
                     );
                   })}
@@ -290,12 +323,16 @@ export default function ProcessTool({ open, onClose }: Props) {
         {message && (
           <div
             className={`mb-4 flex items-center gap-2 text-xs ${
-              status === "done" ? "text-green-400" :
-              status === "error" ? "text-red-400" :
-              "text-gray-300"
+              status === "done"
+                ? "text-green-400"
+                : status === "error"
+                  ? "text-red-400"
+                  : "text-[var(--text-btn)]"
             }`}
           >
-            {status === "processing" && <Loader2 size={14} className="animate-spin" />}
+            {status === "processing" && (
+              <Loader2 size={14} className="animate-spin" />
+            )}
             {status === "done" && <Check size={14} />}
             {status === "error" && <AlertCircle size={14} />}
             {message}
@@ -306,7 +343,7 @@ export default function ProcessTool({ open, onClose }: Props) {
         {status === "selected" && (
           <button
             onClick={handleProcess}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#00d4ff] py-2 text-sm font-medium text-black transition-opacity hover:opacity-90"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--bg-btn-hover)] py-2 text-sm font-medium text-[var(--text-primary)] transition-opacity hover:opacity-90"
           >
             <Download size={14} />
             处理并下载 ZIP
@@ -327,7 +364,7 @@ export default function ProcessTool({ open, onClose }: Props) {
         {status === "error" && (
           <button
             onClick={() => setStatus("selected")}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-yellow-600 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-yellow-600 py-2 text-sm font-medium text-[var(--text-primary)] transition-opacity hover:opacity-90"
           >
             重试
           </button>

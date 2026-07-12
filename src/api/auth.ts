@@ -18,6 +18,20 @@ export async function checkIsAdmin(email: string): Promise<boolean> {
   }
 }
 
+/** 从 n3d_user_profiles 查询用户昵称 */
+async function fetchNickname(uid: string): Promise<string | undefined> {
+  try {
+    const { data } = await supabase
+      .from("n3d_user_profiles")
+      .select("nickname")
+      .eq("uid", uid)
+      .maybeSingle();
+    return data?.nickname || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** 邮箱密码登录 */
 export async function loginWithPassword(
   email: string,
@@ -43,8 +57,11 @@ export async function loginWithPassword(
     }
 
     const username = data.user.email || uid;
-    const isAdmin = await checkIsAdmin(username);
-    const user = { uid, username, isAdmin };
+    const [isAdmin, nickname] = await Promise.all([
+      checkIsAdmin(username),
+      fetchNickname(uid),
+    ]);
+    const user = { uid, username, nickname, isAdmin };
     notifyAuthListeners(user);
     return { success: true, user };
   } catch (e: any) {
@@ -112,6 +129,7 @@ function notifyAuthListeners(
 export async function tryAutoLogin(): Promise<{
   uid: string;
   username: string;
+  nickname?: string;
   isAdmin: boolean;
 } | null> {
   try {
@@ -120,8 +138,11 @@ export async function tryAutoLogin(): Promise<{
     if (user) {
       localStorage.setItem("user_last_activity", String(Date.now()));
       const email = user.email || user.id;
-      const isAdmin = await checkIsAdmin(email);
-      return { uid: user.id, username: email, isAdmin };
+      const [isAdmin, nickname] = await Promise.all([
+        checkIsAdmin(email),
+        fetchNickname(user.id),
+      ]);
+      return { uid: user.id, username: email, nickname, isAdmin };
     }
   } catch {
     // ignore

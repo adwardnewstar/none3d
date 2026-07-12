@@ -14,8 +14,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #0a0e27;
-  color: #ffffff;
+  background: var(--bg-page);
+  color: var(--text-primary);
 }
 
 /* 滚动条样式 */
