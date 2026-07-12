@@ -219,14 +219,20 @@ export default function AppCard({ app, onDelete }: Props) {
 
     // 按框体位置裁剪原图到 640×512（5:4 比例）
     const wrapEl = coverWrapRef.current;
-    const imgEl = wrapEl.querySelector("img");
-    if (!imgEl) return;
+
+    // 用 new Image 加载原图（不再依赖 DOM 中的 img 标签）
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = cropImage;
+    });
 
     const wrapRect = wrapEl.getBoundingClientRect();
     const Cw = wrapRect.width;
     const Ch = wrapRect.height;
-    const Iw = imgEl.naturalWidth;
-    const Ih = imgEl.naturalHeight;
+    const Iw = img.naturalWidth;
+    const Ih = img.naturalHeight;
     const scale = Math.max(Cw / Iw, Ch / Ih);
     const rw = Iw * scale * cropZoom;
     const rh = Ih * scale * cropZoom;
@@ -250,7 +256,7 @@ export default function AppCard({ app, onDelete }: Props) {
     canvas.width = 640;
     canvas.height = 512;
     const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(imgEl, sx, sy, sw, sh, 0, 0, 640, 512);
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, 640, 512);
     const jpegBase64 = canvas.toDataURL("image/jpeg", 0.85);
 
     // 上传到 Supabase Storage
@@ -487,7 +493,7 @@ export default function AppCard({ app, onDelete }: Props) {
                 <input
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="mb-3 w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-btn)]"
+                  className="mb-3 w-full rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-btn)]"
                   placeholder="模型名称"
                 />
 
@@ -498,7 +504,7 @@ export default function AppCard({ app, onDelete }: Props) {
                   value={editDesc}
                   onChange={(e) => setEditDesc(e.target.value)}
                   rows={2}
-                  className="mb-3 w-full resize-none rounded-lg border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-btn)]"
+                  className="mb-3 w-full resize-none rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-btn)]"
                   placeholder="模型描述"
                 />
 
@@ -508,7 +514,7 @@ export default function AppCard({ app, onDelete }: Props) {
                 <input
                   value={editIndexPath}
                   onChange={(e) => setEditIndexPath(e.target.value)}
-                  className="mb-3 w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-btn)]"
+                  className="mb-3 w-full rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-btn)]"
                   placeholder="https://..."
                 />
 
@@ -548,7 +554,7 @@ export default function AppCard({ app, onDelete }: Props) {
                 <input
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="mb-3 w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-btn)]"
+                  className="mb-3 w-full rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-btn)]"
                   placeholder="模型名称"
                 />
 
@@ -559,7 +565,7 @@ export default function AppCard({ app, onDelete }: Props) {
                   value={editDesc}
                   onChange={(e) => setEditDesc(e.target.value)}
                   rows={2}
-                  className="mb-3 w-full resize-none rounded-lg border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-btn)]"
+                  className="mb-3 w-full resize-none rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-btn)]"
                   placeholder="模型描述"
                 />
 
@@ -569,7 +575,7 @@ export default function AppCard({ app, onDelete }: Props) {
                 <input
                   value={editIndexPath}
                   onChange={(e) => setEditIndexPath(e.target.value)}
-                  className="mb-3 w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-btn)]"
+                  className="mb-3 w-full rounded border border-[var(--border-light)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-btn)]"
                   placeholder="https://..."
                 />
 
@@ -578,7 +584,7 @@ export default function AppCard({ app, onDelete }: Props) {
                 </label>
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="mb-4 flex aspect-[5/4] w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-dashed border-[var(--border-btn)] bg-[var(--bg-input)] transition-colors hover:border-white/30 hover:bg-[var(--bg-btn)]"
+                  className="mb-4 flex aspect-[5/4] w-full cursor-pointer items-center justify-center overflow-hidden rounded border border-dashed border-[var(--border-btn)] bg-[var(--bg-input)] transition-colors hover:border-white/30 hover:bg-[var(--bg-btn)]"
                 >
                   {editThumbnail ? (
                     <img
@@ -615,7 +621,7 @@ export default function AppCard({ app, onDelete }: Props) {
                 <button
                   onClick={handleSave}
                   disabled={saving || !editTitle.trim()}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--bg-btn-hover)] py-2 text-sm font-medium text-[var(--text-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
+                  className="flex w-full items-center justify-center gap-1.5 rounded bg-[var(--bg-btn-hover)] py-2 text-sm font-medium text-[var(--text-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
                   {saving ? (
                     `保存${".".repeat(dotCount || 3)}`

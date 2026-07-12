@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 interface CropFrame {
   x: number;
   y: number;
@@ -36,6 +38,21 @@ export default function ImageCropper({
   onZoomChange,
   coverWrapRef,
 }: ImageCropperProps) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  // 非 passive 滚轮事件，支持 preventDefault 阻止页面滚动
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onZoomChange(Math.max(0.5, Math.min(3, cropZoom - e.deltaY * 0.003)));
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, [cropZoom, onZoomChange]);
+
   return (
     <>
       {/* 封面 — 裁剪视图 */}
@@ -43,34 +60,26 @@ export default function ImageCropper({
         封面
       </label>
       <div
-        ref={coverWrapRef}
-        onWheel={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onZoomChange(Math.max(0.5, Math.min(3, cropZoom - e.deltaY * 0.003)));
+        ref={(node) => {
+          (
+            coverWrapRef as React.MutableRefObject<HTMLDivElement | null>
+          ).current = node;
+          wrapRef.current = node;
         }}
-        className="relative mb-4 w-full overflow-hidden rounded-lg bg-black"
+        className="relative mb-4 w-full overflow-hidden rounded bg-black"
         style={{ aspectRatio: "5/4" }}
       >
-        {/* 缩放后的图片 — 以容器中心为锚点 */}
+        {/* 缩放后的图片 — 以容器中心为锚点，background-image 避免 transform+object-fit 渲染问题 */}
         <div
-          className="pointer-events-none absolute select-none"
+          className="pointer-events-none absolute inset-0 select-none"
           style={{
-            top: "50%",
-            left: "50%",
-            width: "100%",
-            height: "100%",
-            transform: `translate(-50%, -50%) scale(${cropZoom})`,
+            backgroundImage: `url(${cropImage})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center center",
+            transform: `scale(${cropZoom})`,
             transformOrigin: "center center",
           }}
-        >
-          <img
-            src={cropImage}
-            alt="封面裁剪"
-            draggable={false}
-            className="h-full w-full object-cover"
-          />
-        </div>
+        />
         {/* 暗色遮罩 — 框外 */}
         <div className="pointer-events-none absolute inset-0">
           <div
@@ -158,14 +167,14 @@ export default function ImageCropper({
       <div className="flex gap-2">
         <button
           onClick={onCropCancel}
-          className="flex-1 rounded-lg border border-[var(--border-light)] px-3 py-2 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-menu-hover)]"
+          className="flex-1 rounded border border-[var(--border-light)] px-3 py-2 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-menu-hover)]"
         >
           取消裁剪
         </button>
         <button
           onClick={onCropConfirm}
           disabled={saving}
-          className="flex-1 rounded-lg bg-[var(--bg-btn-hover)] px-3 py-2 text-xs font-medium text-[var(--text-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
+          className="flex-1 rounded bg-[var(--bg-btn-hover)] px-3 py-2 text-xs font-medium text-[var(--text-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
         >
           {saving ? `保存${".".repeat(dotCount || 3)}` : "确认并保存"}
         </button>
