@@ -26,6 +26,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: https://zwnluqynchoidpiittdp.supabase.co
           VITE_SUPABASE_ANON_KEY: sb_publishable_bmgWwgQxTGMf0r8tyqyTHg__3g7osn1
+          BASE_URL: /none3d/
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
         with:
