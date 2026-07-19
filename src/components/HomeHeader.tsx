@@ -1,6 +1,5 @@
 import { Sun, Moon, Plus, Wrench, LogIn } from "lucide-react";
 import { useUserStore } from "@/store";
-import { generateAvatar } from "@/utils/avatar";
 
 interface Props {
   onUploadOpen?: () => void;
@@ -11,7 +10,7 @@ export default function HomeHeader({
   onUploadOpen,
   onProcessOpen,
 }: Props = {}) {
-  const { user, setShowAuthModal, setProfileOpen, theme, setTheme } =
+  const { user, setShowAuthModal, setProfileOpen, theme, setTheme, avatar } =
     useUserStore();
   // 主题切换按钮 — 未登录/登录态均可用
   const themeToggleBtn = (
@@ -40,13 +39,8 @@ export default function HomeHeader({
     );
   }
 
-  const avatarUrl =
-    localStorage.getItem(`avatar_${user.uid}`) ||
-    (() => {
-      const av = generateAvatar(user.uid);
-      localStorage.setItem(`avatar_${user.uid}`, av);
-      return av;
-    })();
+  // 从 store 读取头像（由 UserProfileModal 在更新时写入）
+  const avatarUrl = avatar || "";
 
   return (
     <>

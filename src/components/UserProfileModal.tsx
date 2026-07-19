@@ -11,7 +11,7 @@ interface Props {
 }
 
 export default function UserProfileModal({ onClose }: Props) {
-  const { user } = useUserStore();
+  const { user, setAvatar: storeSetAvatar } = useUserStore();
   const uid = user?.uid || "";
   const email = user?.username || "";
 
@@ -53,7 +53,7 @@ export default function UserProfileModal({ onClose }: Props) {
         setCompany(profile.company || "");
         if (profile.avatar) {
           setAvatar(profile.avatar);
-          localStorage.setItem(`avatar_${uid}`, profile.avatar);
+          storeSetAvatar(profile.avatar);
         }
       } else {
         setNickname(defaultNickname);
@@ -71,7 +71,7 @@ export default function UserProfileModal({ onClose }: Props) {
     try {
       const dataUrl = await compressAvatar(file);
       setAvatar(dataUrl);
-      localStorage.setItem(`avatar_${uid}`, dataUrl);
+      storeSetAvatar(dataUrl);
     } catch {
       // ignore
     }
@@ -117,7 +117,7 @@ export default function UserProfileModal({ onClose }: Props) {
       company,
     });
     if (success) {
-      localStorage.setItem(`avatar_${uid}`, avatar);
+      storeSetAvatar(avatar);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     }

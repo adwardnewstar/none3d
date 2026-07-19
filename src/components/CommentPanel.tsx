@@ -519,6 +519,7 @@ export default function CommentPanel({
 
   // 登录用户
   const user = useUserStore((s) => s.user);
+  const avatar = useUserStore((s) => s.avatar);
   const requireAuth = useUserStore((s) => s.requireAuth);
 
   // 检查当前用户是否是评论/回复的作者
@@ -1333,10 +1334,7 @@ export default function CommentPanel({
                 title="用户菜单"
               >
                 <img
-                  src={
-                    localStorage.getItem(`avatar_${user.uid}`) ||
-                    generateAvatar(user.uid)
-                  }
+                  src={avatar || generateAvatar(user.uid)}
                   alt="avatar"
                   className="h-full w-full object-cover"
                 />

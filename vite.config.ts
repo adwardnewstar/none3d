@@ -5,6 +5,9 @@ import tsconfigPaths from "vite-tsconfig-paths";
 // https://vite.dev/config/
 export default defineConfig({
   base: process.env.BASE_URL || '/',
+  server: {
+    host: "0.0.0.0",
+  },
   build: {
     sourcemap: 'hidden',
   },

@@ -72,6 +72,10 @@ export default function Home() {
   const [isFullscreen, setIsFullscreen] = useState(
     () => !!document.fullscreenElement,
   );
+  const supportsFullscreen = useMemo(
+    () => typeof document.documentElement.requestFullscreen === "function",
+    [],
+  );
 
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
@@ -263,14 +267,16 @@ export default function Home() {
             </button>
           )}
 
-          {/* 全屏按钮 — 仅手机端显示 */}
-          <button
-            onClick={toggleFullscreen}
-            className="md:hidden flex h-8 w-8 items-center justify-center rounded-full border-2 border-[var(--border-btn)] bg-[var(--bg-input)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-btn-hover)] hover:text-[var(--text-hover)]"
-            title={isFullscreen ? "退出全屏" : "全屏"}
-          >
-            {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
-          </button>
+          {/* 全屏按钮 — 仅支持 Fullscreen API 的设备显示 */}
+          {supportsFullscreen && (
+            <button
+              onClick={toggleFullscreen}
+              className="md:hidden flex h-8 w-8 items-center justify-center rounded-full border-2 border-[var(--border-btn)] bg-[var(--bg-input)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-btn-hover)] hover:text-[var(--text-hover)]"
+              title={isFullscreen ? "退出全屏" : "全屏"}
+            >
+              {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+            </button>
+          )}
         </div>
 
         <div className="max-md:hidden text-center">

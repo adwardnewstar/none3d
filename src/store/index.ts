@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import type { AppItem } from "@/types";
+import { generateAvatar } from "@/utils/avatar";
+import { getProfile } from "@/api/userProfile";
 
 interface AnnotationAction {
   type:
@@ -120,6 +122,8 @@ function applyTheme(theme: Theme) {
 interface UserStore {
   /** 当前登录用户 */
   user: UserInfo | null;
+  /** 头像 dataUrl */
+  avatar: string;
   /** 是否显示登录弹窗 */
   showAuthModal: boolean;
   /** 是否显示个人资料弹窗 */
@@ -130,6 +134,8 @@ interface UserStore {
   theme: Theme;
   /** 设置当前用户 */
   setUser: (user: UserInfo | null) => void;
+  /** 设置头像 */
+  setAvatar: (avatar: string) => void;
   /** 设置登录弹窗显隐 */
   setShowAuthModal: (show: boolean) => void;
   /** 设置个人资料弹窗显隐 */
@@ -146,12 +152,38 @@ interface UserStore {
 
 export const useUserStore = create<UserStore>((set, get) => ({
   user: null,
+  avatar: "",
   showAuthModal: false,
   profileOpen: false,
   pendingAction: null,
   theme: loadTheme(),
 
-  setUser: (user) => set({ user }),
+  setUser: (user) => {
+    if (user) {
+      // 先显示本地头像（缓存或默认）
+      const saved = localStorage.getItem(`avatar_${user.uid}`);
+      const initialAvatar = saved || generateAvatar(user.uid);
+      if (!saved) {
+        localStorage.setItem(`avatar_${user.uid}`, initialAvatar);
+      }
+      set({ user, avatar: initialAvatar });
+
+      // 登录后后台拉数据库最新头像，替换 localStorage + store
+      getProfile(user.uid).then((profile) => {
+        if (profile?.avatar && profile.avatar !== initialAvatar) {
+          localStorage.setItem(`avatar_${user.uid}`, profile.avatar);
+          set({ avatar: profile.avatar });
+        }
+      });
+    } else {
+      set({ user, avatar: "" });
+    }
+  },
+
+  setAvatar: (avatar) => {
+    localStorage.setItem(`avatar_${get().user?.uid}`, avatar);
+    set({ avatar });
+  },
 
   setShowAuthModal: (show) => {
     if (!show) {

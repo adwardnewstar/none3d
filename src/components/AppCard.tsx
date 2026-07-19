@@ -16,6 +16,7 @@ export default function AppCard({ app, onDelete }: Props) {
   const { startView } = useAppStore();
   const user = useUserStore((s) => s.user);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [hamburgerVisible, setHamburgerVisible] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [editTitle, setEditTitle] = useState(app.title);
@@ -57,16 +58,27 @@ export default function AppCard({ app, onDelete }: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!menuOpen && !deleteConfirm) return;
+    if (!menuOpen && !deleteConfirm && !hamburgerVisible) return;
     const close = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        setHamburgerVisible(false);
         setMenuOpen(false);
         setDeleteConfirm(false);
       }
     };
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
-  }, [menuOpen, deleteConfirm]);
+  }, [menuOpen, deleteConfirm, hamburgerVisible]);
+
+  // 跨卡片通信：其他卡片长按时关闭当前卡片的汉堡包和菜单
+  useEffect(() => {
+    const close = () => {
+      setHamburgerVisible(false);
+      setMenuOpen(false);
+    };
+    window.addEventListener("close-card-menus", close);
+    return () => window.removeEventListener("close-card-menus", close);
+  }, []);
 
   const thumbSrc =
     app.thumbnail && app.thumbnail.startsWith("http") ? app.thumbnail : null;
@@ -346,7 +358,13 @@ export default function AppCard({ app, onDelete }: Props) {
         ref={cardRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        className="group relative overflow-hidden rounded-[10px] border-2 border-[var(--border-card)] bg-[var(--bg-card)] transition-shadow duration-200 hover:scale-[1.013]"
+        onContextMenu={(e) => {
+          // 移动端长按 → 关闭其他卡片 + 显示当前卡片的汉堡包（不展开菜单）
+          e.preventDefault();
+          window.dispatchEvent(new Event("close-card-menus"));
+          setHamburgerVisible(true);
+        }}
+        className="group relative select-none overflow-hidden rounded-[10px] border-2 border-[var(--border-card)] bg-[var(--bg-card)] transition-shadow duration-200 hover:scale-[1.013]"
         style={{
           boxShadow:
             shadowPos.x || shadowPos.y
@@ -362,6 +380,7 @@ export default function AppCard({ app, onDelete }: Props) {
                 setMenuOpen((v) => !v);
               }}
               className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--bg-btn)] text-[var(--text-btn)] opacity-0 transition-all hover:bg-[var(--bg-btn-hover)] hover:text-[var(--text-hover)] group-hover:opacity-100"
+              style={hamburgerVisible ? { opacity: 1 } : undefined}
             >
               <MoreVertical size={14} />
             </button>
@@ -473,7 +492,7 @@ export default function AppCard({ app, onDelete }: Props) {
             if (e.target === e.currentTarget && !cropDrag) setEditOpen(false);
           }}
         >
-          <div className="w-80 rounded-[10px] border-2 border-[var(--border-card)] bg-[var(--bg-card)] p-5 shadow-xl">
+          <div className="w-80 select-none rounded-[10px] border-2 border-[var(--border-card)] bg-[var(--bg-card)] p-5 shadow-xl">
             {cropImage ? (
               <>
                 <div className="mb-4 flex items-center justify-between">
