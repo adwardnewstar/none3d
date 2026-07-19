@@ -13,17 +13,30 @@ export default function HomeHeader({
 }: Props = {}) {
   const { user, setShowAuthModal, setProfileOpen, theme, setTheme } =
     useUserStore();
-  // 主题切换：直接切换深色/浅色
+  // 主题切换按钮 — 未登录/登录态均可用
+  const themeToggleBtn = (
+    <button
+      key="theme-toggle"
+      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--border-btn)] bg-[var(--bg-input)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-btn-hover)] hover:text-[var(--text-hover)]"
+      title={theme === "dark" ? "切换浅色" : "切换深色"}
+    >
+      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
+  );
 
   if (!user) {
     return (
-      <button
-        onClick={() => setShowAuthModal(true)}
-        className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--border-btn)] bg-[var(--bg-input)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-btn-hover)] hover:text-[var(--text-hover)]"
-        title="登录"
-      >
-        <LogIn size={18} />
-      </button>
+      <div className="flex items-center gap-2">
+        {themeToggleBtn}
+        <button
+          onClick={() => setShowAuthModal(true)}
+          className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--border-btn)] bg-[var(--bg-input)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-btn-hover)] hover:text-[var(--text-hover)]"
+          title="登录"
+        >
+          <LogIn size={18} />
+        </button>
+      </div>
     );
   }
 
@@ -57,14 +70,7 @@ export default function HomeHeader({
             </button>
           </>
         )}
-        {/* 主题切换按钮 — 点击直接切换 */}
-        <button
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--border-btn)] bg-[var(--bg-input)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-btn-hover)] hover:text-[var(--text-hover)]"
-          title={theme === "dark" ? "切换浅色" : "切换深色"}
-        >
-          {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
+        {themeToggleBtn}
 
         {/* 用户头像 — 点击直接进入资料页 */}
         <button

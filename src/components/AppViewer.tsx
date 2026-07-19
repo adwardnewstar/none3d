@@ -48,6 +48,18 @@ export default function AppViewer() {
 
   const [iframeLoading, setIframeLoading] = useState(false);
 
+  // Verge3D 加载完成状态（检测 #custom-preloader 消失）
+  const [verge3dLoaded, setVerge3dLoaded] = useState(false);
+  const verge3dPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 轮播建议文案
+  const TIPS = [
+    "本项目仅支持 Verge3d 工程文件修改",
+    "进行批注的语言内容保持简练精确",
+    "建议使用电脑操作",
+  ];
+  const [tipIndex, setTipIndex] = useState(0);
+
   // 侧边栏折叠状态（默认折叠）
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -173,6 +185,12 @@ export default function AppViewer() {
       switch (msg.type) {
         case "annotation-bridge-ready":
           restoreCalibratedRef.current();
+          // annotation.js 已就绪 → Verge3D 加载完成（跨域 iframe 也能收到此信号）
+          setVerge3dLoaded(true);
+          if (verge3dPollRef.current) {
+            clearInterval(verge3dPollRef.current);
+            verge3dPollRef.current = null;
+          }
           break;
 
         case "position-picked":
@@ -238,6 +256,64 @@ export default function AppViewer() {
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [handleMessage]);
+
+  // 轮询检测 iframe 内 Verge3D 预加载是否完成
+  useEffect(() => {
+    if (!viewing) return;
+    // 切换项目时重置
+    setVerge3dLoaded(false);
+    setTipIndex(0);
+
+    verge3dPollRef.current = setInterval(() => {
+      try {
+        const iframe = iframeRef.current;
+        if (!iframe) return;
+        const doc =
+          iframe.contentDocument || (iframe.contentWindow as any)?.document;
+        if (doc) {
+          const preloader = doc.getElementById("custom-preloader");
+          if (!preloader) {
+            setVerge3dLoaded(true);
+            if (verge3dPollRef.current) {
+              clearInterval(verge3dPollRef.current);
+              verge3dPollRef.current = null;
+            }
+          }
+        }
+      } catch (_) {
+        // iframe 未就绪或跨域错误，忽略
+      }
+    }, 500);
+
+    return () => {
+      if (verge3dPollRef.current) {
+        clearInterval(verge3dPollRef.current);
+        verge3dPollRef.current = null;
+      }
+    };
+  }, [viewing]);
+
+  // 超时兜底：30 秒后强制显示工具栏（防止某些项目无 annotation.js 导致卡死）
+  useEffect(() => {
+    if (!viewing || verge3dLoaded) return;
+    const timer = setTimeout(() => {
+      setVerge3dLoaded(true);
+      if (verge3dPollRef.current) {
+        clearInterval(verge3dPollRef.current);
+        verge3dPollRef.current = null;
+      }
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [viewing, verge3dLoaded]);
+
+  // 轮播文案切换
+  useEffect(() => {
+    if (verge3dLoaded) return;
+    const interval = setInterval(() => {
+      setTipIndex((prev) => (prev + 1) % TIPS.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [verge3dLoaded, TIPS.length]);
 
   // 标定显示切换
   const toggleAnnotations = () => {
@@ -435,35 +511,37 @@ export default function AppViewer() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[var(--bg-page)]">
       {/* 顶部栏：关闭(左) + 标题(中) + 评论按钮(右) — 绝对定位浮在 iframe 上 */}
-      <div className="absolute left-0 right-0 top-0 z-50 flex h-12 items-center justify-between px-4">
-        {/* 左侧：关闭 */}
-        <button
-          onClick={closeView}
-          className="flex items-center gap-1.5 rounded-full bg-[var(--bg-btn)] px-3 py-1.5 text-xs text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-btn-hover)]"
-        >
-          <X size={14} />
-          关闭
-        </button>
-
-        {/* 中间：标题 */}
-        <span className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-[var(--text-primary)]">
-          {viewing.title}
-        </span>
-
-        {/* 右侧：评论按钮（侧栏折叠时显示） */}
-        {!sidebarOpen && (
+      {verge3dLoaded && (
+        <div className="absolute left-0 right-0 top-0 z-50 flex h-12 items-center justify-between px-4">
+          {/* 左侧：关闭 */}
           <button
-            onClick={() => setSidebarOpen(true)}
+            onClick={closeView}
             className="flex items-center gap-1.5 rounded-full bg-[var(--bg-btn)] px-3 py-1.5 text-xs text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-btn-hover)]"
-            title="展开评论"
           >
-            <PanelLeftClose size={14} className="hidden md:inline" />
-            <ChevronUp size={14} className="md:hidden" />
-            评论
+            <X size={14} />
+            关闭
           </button>
-        )}
-        {/* 侧栏展开时右侧留空占位，保持标题居中 */}
-      </div>
+
+          {/* 中间：标题 */}
+          <span className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-[var(--text-primary)]">
+            {viewing.title}
+          </span>
+
+          {/* 右侧：评论按钮（侧栏折叠时显示） */}
+          {!sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="flex items-center gap-1.5 rounded-full bg-[var(--bg-btn)] px-3 py-1.5 text-xs text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-btn-hover)]"
+              title="展开评论"
+            >
+              <PanelLeftClose size={14} className="hidden md:inline" />
+              <ChevronUp size={14} className="md:hidden" />
+              评论
+            </button>
+          )}
+          {/* 侧栏展开时右侧留空占位，保持标题居中 */}
+        </div>
+      )}
 
       {/* 主体：iframe + 底部按钮 */}
       <div className="relative flex-1">
@@ -489,92 +567,106 @@ export default function AppViewer() {
           sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
         />
 
+        {/* Verge3D 加载中遮罩 — 半透明让 iframe 内预加载圆圈可见 */}
+        {!verge3dLoaded && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-end bg-black/20 pb-24">
+            <p
+              key={tipIndex}
+              className="text-sm text-white/70 transition-all duration-500"
+            >
+              {TIPS[tipIndex]}
+            </p>
+          </div>
+        )}
+
         {/* 底部居中：操作按钮 */}
-        <div className="absolute bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-end gap-2">
-          {/* 坐标操作按钮组 */}
-          <div className="flex flex-col items-center gap-1">
-            {axisModeActive && (
-              <div className="mb-1 flex flex-col items-center gap-1">
-                {(["z", "y", "x"] as const).map((ax) => (
-                  <button
-                    key={ax}
-                    onClick={() => handleSelectAxis(ax)}
-                    className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs shadow-sm backdrop-blur transition-colors ${
-                      activeAxis === ax
-                        ? "border-orange-700/80 bg-orange-500/90 text-white"
-                        : "border-red-800/40 bg-red-600/30 text-red-200 hover:bg-red-600/50"
-                    }`}
-                    title={`选中${ax.toUpperCase()}轴`}
-                  >
-                    {ax.toUpperCase()}轴
-                  </button>
-                ))}
-              </div>
-            )}
+        {verge3dLoaded && (
+          <div className="absolute bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-end gap-2">
+            {/* 坐标操作按钮组 */}
+            <div className="flex flex-col items-center gap-1">
+              {axisModeActive && (
+                <div className="mb-1 flex flex-col items-center gap-1">
+                  {(["z", "y", "x"] as const).map((ax) => (
+                    <button
+                      key={ax}
+                      onClick={() => handleSelectAxis(ax)}
+                      className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs shadow-sm backdrop-blur transition-colors ${
+                        activeAxis === ax
+                          ? "border-orange-700/80 bg-orange-500/90 text-white"
+                          : "border-red-800/40 bg-red-600/30 text-red-200 hover:bg-red-600/50"
+                      }`}
+                      title={`选中${ax.toUpperCase()}轴`}
+                    >
+                      {ax.toUpperCase()}轴
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={toggleAxisMode}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-sm backdrop-blur transition-colors ${
+                  axisModeActive
+                    ? "border-orange-800/80 bg-orange-600/80 text-white hover:bg-orange-700"
+                    : "border-red-800/40 bg-red-600/30 text-white hover:bg-red-600/50"
+                }`}
+                title={axisModeActive ? "退出坐标操作" : "进入坐标操作"}
+              >
+                <Move size={14} />
+                <span className="max-md:hidden">坐标操作</span>
+              </button>
+            </div>
+
             <button
-              onClick={toggleAxisMode}
+              onClick={toggleAnnotations}
+              disabled={axisModeActive}
               className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-sm backdrop-blur transition-colors ${
                 axisModeActive
-                  ? "border-orange-800/80 bg-orange-600/80 text-white hover:bg-orange-700"
-                  : "border-red-800/40 bg-red-600/30 text-white hover:bg-red-600/50"
+                  ? "border-black/40 bg-black/20 text-gray-600 cursor-not-allowed"
+                  : annotationsVisible
+                    ? "border-blue-800/80 bg-blue-600/80 text-white hover:bg-blue-700"
+                    : "border-black/60 bg-black/40 text-gray-400 hover:bg-black/60"
               }`}
-              title={axisModeActive ? "退出坐标操作" : "进入坐标操作"}
+              title={annotationsVisible ? "隐藏标注" : "显示标注"}
             >
-              <Move size={14} />
-              <span className="max-md:hidden">坐标操作</span>
+              {annotationsVisible ? <Eye size={14} /> : <EyeOff size={14} />}
+              <span className="max-md:hidden">
+                {annotationsVisible ? "隐藏标注" : "显示标注"}
+              </span>
+            </button>
+
+            <button
+              onClick={axisModeActive ? undefined : toggleCoordinates}
+              disabled={axisModeActive}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-sm backdrop-blur transition-colors ${
+                axisModeActive
+                  ? "border-black/40 bg-black/20 text-gray-600 cursor-not-allowed"
+                  : coordinatesVisible
+                    ? "border-blue-800/80 bg-blue-600/80 text-white hover:bg-blue-700"
+                    : "border-black/60 bg-black/40 text-gray-400 hover:bg-black/60"
+              }`}
+              title={coordinatesVisible ? "隐藏标记组" : "显示标记组"}
+            >
+              <MapPin size={14} />
+              <span className="max-md:hidden">
+                {coordinatesVisible ? "隐藏坐标" : "显示坐标"}
+              </span>
+            </button>
+
+            <button
+              onClick={startViewCalibrate}
+              disabled={axisModeActive || awaitingMarkerPos}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-sm backdrop-blur transition-colors ${
+                axisModeActive
+                  ? "border-black/40 bg-black/20 text-gray-600 cursor-not-allowed"
+                  : "border-green-800/80 bg-green-600/80 text-white hover:bg-green-700 disabled:opacity-60"
+              }`}
+              title="获取标记组位置生成标定"
+            >
+              <PlusCircle size={14} />
+              <span className="max-md:hidden">确认标定</span>
             </button>
           </div>
-
-          <button
-            onClick={toggleAnnotations}
-            disabled={axisModeActive}
-            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-sm backdrop-blur transition-colors ${
-              axisModeActive
-                ? "border-black/40 bg-black/20 text-gray-600 cursor-not-allowed"
-                : annotationsVisible
-                  ? "border-blue-800/80 bg-blue-600/80 text-white hover:bg-blue-700"
-                  : "border-black/60 bg-black/40 text-gray-400 hover:bg-black/60"
-            }`}
-            title={annotationsVisible ? "隐藏标注" : "显示标注"}
-          >
-            {annotationsVisible ? <Eye size={14} /> : <EyeOff size={14} />}
-            <span className="max-md:hidden">
-              {annotationsVisible ? "隐藏标注" : "显示标注"}
-            </span>
-          </button>
-
-          <button
-            onClick={axisModeActive ? undefined : toggleCoordinates}
-            disabled={axisModeActive}
-            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-sm backdrop-blur transition-colors ${
-              axisModeActive
-                ? "border-black/40 bg-black/20 text-gray-600 cursor-not-allowed"
-                : coordinatesVisible
-                  ? "border-blue-800/80 bg-blue-600/80 text-white hover:bg-blue-700"
-                  : "border-black/60 bg-black/40 text-gray-400 hover:bg-black/60"
-            }`}
-            title={coordinatesVisible ? "隐藏标记组" : "显示标记组"}
-          >
-            <MapPin size={14} />
-            <span className="max-md:hidden">
-              {coordinatesVisible ? "隐藏坐标" : "显示坐标"}
-            </span>
-          </button>
-
-          <button
-            onClick={startViewCalibrate}
-            disabled={axisModeActive || awaitingMarkerPos}
-            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-sm backdrop-blur transition-colors ${
-              axisModeActive
-                ? "border-black/40 bg-black/20 text-gray-600 cursor-not-allowed"
-                : "border-green-800/80 bg-green-600/80 text-white hover:bg-green-700 disabled:opacity-60"
-            }`}
-            title="获取标记组位置生成标定"
-          >
-            <PlusCircle size={14} />
-            <span className="max-md:hidden">确认标定</span>
-          </button>
-        </div>
+        )}
       </div>
 
       {/* 侧边栏：桌面从右侧滑入，手机从底部滑出 */}

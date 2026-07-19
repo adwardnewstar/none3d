@@ -103,7 +103,9 @@ function loadTheme(): Theme {
     const saved = localStorage.getItem("theme");
     if (saved === "light" || saved === "dark") return saved;
   }
-  return "dark";
+  // 首次访问，根据当前时间自动判断：6:00~18:00 浅色，其余深色
+  const hour = new Date().getHours();
+  return hour >= 6 && hour < 18 ? "light" : "dark";
 }
 
 function applyTheme(theme: Theme) {

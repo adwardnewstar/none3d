@@ -495,9 +495,14 @@ export function processJs(js: string): string {
     /function prepareFullscreen[\s\S]*?function prepareExternalInterface/,
     "function prepareExternalInterface",
   );
-  r = r.replace(/const disposeFullscreen\s*=\s*prepareFullscreen.*?$/m, "");
-  r = r.replace(/^\s+initOptions\.useFullscreen\);\r?$/m, "");
-  r = r.replace(/^\s*app\.addEventListener\(.*?dispose.*$/m, "");
+  r = r.replace(
+    /const disposeFullscreen\s*=\s*prepareFullscreen[\s\S]*?\)\s*;/m,
+    "",
+  );
+  r = r.replace(
+    /^\s*app\.addEventListener\([\s\S]*?dispose[\s\S]*?\)\s*;/m,
+    "",
+  );
   r = r.replace(
     /new v3d\.SimplePreloader\(\{ container: containerId \}\)/,
     "createRingPreloader()",

@@ -182,7 +182,7 @@ export default function Home() {
       <main className="flex-1 px-6 py-10">
         {loading ? (
           <div className="flex items-center justify-center py-20 text-[var(--text-secondary)]">
-            <div className="h-[120px] w-[120px] animate-spin rounded-full border-[4px] border-[var(--spinner-bg)] border-t-[var(--spinner-fg)]" />
+            <div className="h-[108px] w-[108px] animate-spin rounded-full border-[4px] border-[var(--spinner-bg)] border-t-[var(--spinner-fg)]" />
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-20 text-[var(--text-secondary)]">
