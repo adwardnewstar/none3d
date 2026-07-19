@@ -414,7 +414,9 @@ export default function AppCard({ app, onDelete }: Props) {
                 <img
                   src={thumbSrc}
                   alt={app.title}
-                  className="h-full w-full object-cover"
+                  draggable={false}
+                  className="h-full w-full select-none object-cover"
+                  style={{ WebkitTouchCallout: "none" }}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-[var(--border-light)]">
@@ -590,7 +592,9 @@ export default function AppCard({ app, onDelete }: Props) {
                     <img
                       src={editThumbnail}
                       alt="封面"
-                      className="h-full w-full object-cover"
+                      draggable={false}
+                      className="h-full w-full select-none object-cover"
+                      style={{ WebkitTouchCallout: "none" }}
                     />
                   ) : (
                     <div className="flex flex-col items-center gap-1 text-[var(--text-muted)]">
