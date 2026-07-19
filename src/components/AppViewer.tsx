@@ -52,14 +52,6 @@ export default function AppViewer() {
   const [verge3dLoaded, setVerge3dLoaded] = useState(false);
   const verge3dPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // 轮播建议文案
-  const TIPS = [
-    "本项目仅支持 Verge3d 工程文件修改",
-    "进行批注的语言内容保持简练精确",
-    "建议使用电脑操作",
-  ];
-  const [tipIndex, setTipIndex] = useState(0);
-
   // 侧边栏折叠状态（默认折叠）
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -183,16 +175,6 @@ export default function AppViewer() {
       if (!msg || !msg.type) return;
 
       switch (msg.type) {
-        case "annotation-bridge-ready":
-          restoreCalibratedRef.current();
-          // annotation.js 已就绪 → Verge3D 加载完成（跨域 iframe 也能收到此信号）
-          setVerge3dLoaded(true);
-          if (verge3dPollRef.current) {
-            clearInterval(verge3dPollRef.current);
-            verge3dPollRef.current = null;
-          }
-          break;
-
         case "position-picked":
           if (onPickedRef.current) {
             onPickedRef.current(msg.commentId, msg.position);
@@ -257,12 +239,26 @@ export default function AppViewer() {
     return () => window.removeEventListener("message", handleMessage);
   }, [handleMessage]);
 
+  // 稳定的 annotation-bridge-ready 监听（独立于 handleMessage，避免重注册丢失消息）
+  useEffect(() => {
+    function onBridgeReady(e: MessageEvent) {
+      if (e.data?.type !== "annotation-bridge-ready") return;
+      restoreCalibratedRef.current();
+      setVerge3dLoaded(true);
+      if (verge3dPollRef.current) {
+        clearInterval(verge3dPollRef.current);
+        verge3dPollRef.current = null;
+      }
+    }
+    window.addEventListener("message", onBridgeReady);
+    return () => window.removeEventListener("message", onBridgeReady);
+  }, []);
+
   // 轮询检测 iframe 内 Verge3D 预加载是否完成
   useEffect(() => {
     if (!viewing) return;
     // 切换项目时重置
     setVerge3dLoaded(false);
-    setTipIndex(0);
 
     verge3dPollRef.current = setInterval(() => {
       try {
@@ -305,15 +301,6 @@ export default function AppViewer() {
     }, 30000);
     return () => clearTimeout(timer);
   }, [viewing, verge3dLoaded]);
-
-  // 轮播文案切换
-  useEffect(() => {
-    if (verge3dLoaded) return;
-    const interval = setInterval(() => {
-      setTipIndex((prev) => (prev + 1) % TIPS.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [verge3dLoaded, TIPS.length]);
 
   // 标定显示切换
   const toggleAnnotations = () => {
@@ -566,18 +553,6 @@ export default function AppViewer() {
           title={viewing.title}
           sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
         />
-
-        {/* Verge3D 加载中遮罩 — 半透明让 iframe 内预加载圆圈可见 */}
-        {!verge3dLoaded && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-end bg-black/20 pb-24">
-            <p
-              key={tipIndex}
-              className="text-sm text-white/70 transition-all duration-500"
-            >
-              {TIPS[tipIndex]}
-            </p>
-          </div>
-        )}
 
         {/* 底部居中：操作按钮 */}
         {verge3dLoaded && (
