@@ -26,9 +26,17 @@
         document.documentElement.classList.add('theme-' + theme);
       })();
     </script>
+    <style>
+      img { -webkit-touch-callout: none; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      document.addEventListener('contextmenu', function(e) {
+        if (e.target.tagName === 'IMG') { e.preventDefault(); }
+      }, true);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
